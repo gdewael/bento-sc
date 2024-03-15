@@ -5,6 +5,7 @@ import lightning.pytorch as pl
 from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
 
+
 class EmbeddingGater(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -13,13 +14,15 @@ class EmbeddingGater(nn.Module):
     def forward(self, x):
         return F.tanh(x) * self.embedding
 
+
 class EmbeddingPseudoQuantizer(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
         self.embedding = nn.Parameter(torch.empty(in_dim, out_dim).uniform_(-1, 1))
 
     def forward(self, x):
-        return F.softmax(x, dim = -1) @ self.embedding
+        return F.softmax(x, dim=-1) @ self.embedding
+
 
 class ExpressTransformer(pl.LightningModule):
     def __init__(

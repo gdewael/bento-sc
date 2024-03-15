@@ -115,8 +115,9 @@ class CellSampleProcessor:
         sample = self.processor(sample)
         return sample
 
+
 class RankCounts:
-    def __init__(self, key = "gene_counts"):
+    def __init__(self, key="gene_counts"):
         self.key = key
 
     def __call__(self, sample):
