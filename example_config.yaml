@@ -1,0 +1,59 @@
+data_path: "../cellxgene.h5t"
+
+batch_size: 16
+
+n_workers: 4
+
+in_memory: False
+
+return_zeros: False
+
+input_processing:
+  - type: RankCounts
+    key: "gene_counts"
+
+  - type: CountsPerX
+    key: "gene_counts"
+    factor: 10_000
+
+  - type: FixedNorm
+    key: "gene_counts"
+    factor: 0.01
+
+  - type: LogP1
+    key: "gene_counts"
+
+  - type: Bin
+    bins: "../express/express/utils/bins50.txt"
+    key: "gene_counts"
+
+  - type: DuplicateCells
+    affected_keys: ["gene_counts", "gene_index", "gene_counts_true"]
+
+  - type: FilterTopGenes
+    affected_keys: ["gene_counts", "gene_index", "gene_counts_true"]
+    number: 1024
+
+  - type: FilterRandomGenes
+    affected_keys: ["gene_counts", "gene_index", "gene_counts_true"]
+    number: 1024
+
+  - type: PoissonResample
+    key: "gene_counts"
+    clamp_1: True
+
+  - type: GaussianResample
+    key: "gene_counts"
+    std: 1
+  
+  - type: BinomialSubsample
+    key: "gene_counts"
+    p: 0.75
+    clamp_1: True
+
+  - type: Mask
+    p: 0.15
+    key: "gene_counts"
+
+  - type: MolecularCV
+    p_to_train: 0.8

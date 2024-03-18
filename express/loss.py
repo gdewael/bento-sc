@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class ExpressLoss(nn.Module):
-    def __init__(self, in_dim, out_dim, reduction="mean", activation="exp"):
+    def __init__(self, in_dim, out_dim, reduction="mean"):
         super().__init__()
 
         self.output_head = nn.Linear(in_dim, out_dim)
@@ -16,10 +16,13 @@ class ExpressLoss(nn.Module):
         elif reduction == "none":
             self.reduce = lambda x: x
 
-    def forward(self):
+    def predict(self, *args):
         raise NotImplementedError
 
-    def loss(self, inputs, targets):
+    def forward(self, *args):
+        raise NotImplementedError
+
+    def loss(self, *args):
         raise NotImplementedError
 
 
@@ -220,3 +223,31 @@ class ZeroInflatedNegativeBinomialNLL(NegativeBinomialNLL):
     def forward(self, x, targets, gene_ids=None):
         mus, log_thetas, pis = self.predict(x, gene_ids=gene_ids, libsize=targets.sum())
         return self.loss(mus, log_thetas, pis, targets)
+
+
+class NCELoss(ExpressLoss):
+    def __init__(
+        self,
+        dim,
+        embed_dim,
+        reduction="mean",
+        temperature=1,
+    ):
+        super().__init__(dim, embed_dim, reduction=reduction)
+        self.t = temperature
+
+    def predict(self, x):
+        return self.output_head(x)
+
+    def loss(self, inputs):
+        n = len(inputs)
+        targets = torch.arange(n).view(n // 2, 2).fliplr().view(n)
+
+        inputs = F.normalize(inputs)
+        inputs = (inputs @ inputs.T) / self.t
+        inputs.fill_diagonal_(float("-inf"))
+        return self.reduce(F.cross_entropy(inputs, targets, reduction="none"))
+
+    def forward(self, x):
+        y = self.predict(x)
+        return self.loss(y)
