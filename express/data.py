@@ -311,18 +311,23 @@ def batch_collater(batch):
 
         if batch[0][name].ndim == 1:
             if len({b[name].shape for b in batch}) == 1:
-                batch_collated[k] = torch.stack([b[name] for b in batch])
+                batch_collated[name] = torch.stack([b[name] for b in batch])
             else:
                 batch_collated[name] = pad_sequence(
                     [b[name] for b in batch], batch_first=True, padding_value=padval
                 )
         else:
             if len({b[name].shape for b in batch}) == 1:
-                batch_collated[k] = torch.cat([b[name] for b in batch], 0)
+                batch_collated[name] = torch.cat([b[name] for b in batch], 0)
             batch_collated[name] = rearrange(
                 pad_sequence(
                     [b[name].T for b in batch], batch_first=True, padding_value=padval
                 ),
                 "b l k -> (b k) l",
             )
+
+    if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
+        batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
+        batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
+        
     return batch_collated
