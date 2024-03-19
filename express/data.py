@@ -200,32 +200,65 @@ class FilterTopGenes:
         return sample
 
 
+class FilterHVG:
+    def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024):
+        path = files("express.utils").joinpath("hvg.npy")
+        var = np.load(path)
+        self.to_select = np.argsort(var)[::-1][:number]
+        self.affected_keys = affected_keys
+
+    def __call__(self, sample):
+        if sample[self.affected_keys[0]].ndim == 1:
+            indices = torch.argsort(sample["gene_index"])[self.to_select]
+            for a in self.affected_keys:
+                sample[a] = sample[a][indices]
+        else:
+            indices = torch.argsort(sample["gene_index"])[:, self.to_select]
+            for a in self.affected_keys:
+                sample[a] = sample[a][torch.arange(2).unsqueeze(-1), indices]
+        return sample
+
+
 class FilterRandomGenes:
     def __init__(
         self,
         number=1024,
         affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
+        proportional_hvg = False,
     ):
         self.n = number
         self.affected_keys = affected_keys
+        if proportional_hvg:
+            path = files("express.utils").joinpath("hvg.npy")
+            var = np.load(path)
+            self.p = np.exp(np.log10(var+1e-8)/5)/np.exp(np.log10(var+1e-8)/5).sum()
+        self.proportional_hvg = proportional_hvg
 
     def __call__(self, sample):
         if sample[self.affected_keys[0]].ndim == 1:
             len_ = len(sample[self.affected_keys[0]])
-            indices = torch.randperm(len_)[: self.n]
+            indices = self._sample(sample, len_)
             for a in self.affected_keys:
                 sample[a] = sample[a][indices]
         else:
             len_ = len(sample[self.affected_keys[0]][0])
             indices = torch.stack(
                 [
-                    torch.randperm(len_)[: self.n],
-                    torch.randperm(len_)[: self.n],
+                    self._sample(sample, len_),
+                    self._sample(sample, len_),
                 ]
             )
             for a in self.affected_keys:
                 sample[a] = sample[a][torch.arange(2).unsqueeze(-1), indices]
         return sample
+    
+    def _sample(self, sample, len_):
+        if not self.proportional_hvg:
+            return torch.randperm(len_)[: self.n]
+        else:
+            assert len_ == 19331, "proportional hvg sampling can only be done on all genes"
+            to_sample_gene_ix = torch.tensor(np.random.choice(len_, size=(self.n, ), p=self.p), replace=False)
+            return torch.argsort(sample["gene_index"])[to_sample_gene_ix]
 
 
 class PoissonResample:

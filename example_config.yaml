@@ -31,9 +31,14 @@ input_processing:
     affected_keys: ["gene_counts", "gene_index", "gene_counts_true"]
     number: 1024
 
+  - type: FilterHVG
+    affected_keys: ["gene_counts", "gene_index", "gene_counts_true"]
+    number: 1024
+
   - type: FilterRandomGenes
     affected_keys: ["gene_counts", "gene_index", "gene_counts_true"]
     number: 1024
+    proportional_hvg: False
 
   - type: PoissonResample
     key: "gene_counts"
