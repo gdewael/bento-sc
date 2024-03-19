@@ -36,7 +36,7 @@ class BinCE(ExpressLoss):
     def loss(self, inputs, targets):
         return self.reduce(F.cross_entropy(inputs, targets, reduction="none"))
 
-    def forward(self, x, targets):
+    def forward(self, x, targets, **kwargs):
         y = self.predict(x)
         return self.loss(y, targets)
 
@@ -60,7 +60,7 @@ class CountMSE(ExpressLoss):
     def loss(self, inputs, targets):
         return self.reduce(F.mse_loss(inputs, targets, reduction="none"))
 
-    def forward(self, x, targets):
+    def forward(self, x, targets, **kwargs):
         y = self.predict(x, libsize=targets.sum())
         return self.loss(y, targets)
 
@@ -100,7 +100,7 @@ class PoissonNLL(ExpressLoss):
         else:
             return self.reduce(loss + torch.lgamma(targets + 1))
 
-    def forward(self, x, targets):
+    def forward(self, x, targets, **kwargs):
         y = self.predict(x, libsize=targets.sum())
         return self.loss(y, targets)
 
@@ -251,3 +251,23 @@ class NCELoss(ExpressLoss):
     def forward(self, x):
         y = self.predict(x)
         return self.loss(y)
+
+
+class CellTypeClfLoss(ExpressLoss):
+    def __init__(
+        self,
+        dim,
+        n_classes,
+        reduction="mean",
+    ):
+        super().__init__(dim, n_classes, reduction=reduction)
+
+    def predict(self, x):
+        return self.output_head(x)
+
+    def loss(self, inputs, targets):
+        return self.reduce(F.cross_entropy(inputs, targets, reduction="none"))
+
+    def forward(self, x, targets):
+        y = self.predict(x)
+        return self.loss(y, targets)

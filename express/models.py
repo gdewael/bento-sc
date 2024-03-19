@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import lightning.pytorch as pl
 from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
+from express import loss
+import yaml
 
 
 class EmbeddingGater(nn.Module):
@@ -27,36 +29,53 @@ class EmbeddingPseudoQuantizer(nn.Module):
 class ExpressTransformer(pl.LightningModule):
     def __init__(
         self,
-        discrete_input=False,
-        n_discrete_tokens=10,
-        dim=64,
-        depth=8,
-        dropout=0.15,
-        n_genes=19331,
-        lr=1e-4,
+        config_path
     ):
         super().__init__()
-        if discrete_input:
-            self.embedder = DiscreteEmbedding(n_discrete_tokens, dim, cls=True)
+
+        with open(config_path) as f:
+            self.config = yaml.load(f, Loader=yaml.Loader)
+
+        if self.config.discrete_input:
+            self.embedder = DiscreteEmbedding(self.config.n_discrete_tokens, self.config.dim, cls=True)
         else:
-            self.embedder = ContinuousEmbedding(dim, cls=True)
+            self.embedder = ContinuousEmbedding(self.config.dim, cls=True)
 
         self.transformer = TransformerEncoder(
-            depth=depth,
-            dim=dim,
+            depth=self.config.depth,
+            dim=self.config.dim,
             nh=8,
             attentiontype="vanilla",
-            attention_args={"dropout": dropout},
+            attention_args={"dropout": self.config.dropout},
             plugintype="learned",
-            plugin_args={"dim": dim, "max_seq_len": n_genes},
-            only_apply_plugin_at_first=False,
-            dropout=dropout,
+            plugin_args={"dim": self.config.dim, "max_seq_len": self.config.n_genes},
+            only_apply_plugin_at_first=True,
+            dropout=self.config.dropout,
             glu_ff=True,
             activation="gelu",
         )
 
-        self.output_head = nn.Linear(dim, n_discrete_tokens)
-        self.lr = lr
+        self.output_head = nn.Linear(self.config.dim, self.config.n_discrete_tokens)
+        
+        
+        loss_mapper = {
+            "BinCE": loss.BinCE,
+            "CountMSE": loss.CountMSE,
+            "PoissonNLL": loss.PoissonNLL,
+            "NegativeBinomialNLL": loss.NegativeBinomialNLL,
+            "ZeroInflatedNegativeBinomialNLL": loss.ZeroInflatedNegativeBinomialNLL,
+
+        }
+        type_ = self.config.loss.pop("type")
+        self.loss = loss_mapper[type_](self.config.dim, **self.config.loss)
+
+        if self.config.nce_loss:
+            self.nce_loss = loss.NCELoss(self.config.dim, self.config.nce_dim, temperature=self.config.nce_temp)
+
+        if self.config.celltype_clf_loss:
+            self.ct_clf_loss = loss.CellTypeClfLoss(self.config.dim, 164)
+
+        self.lr = self.config.lr
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
@@ -66,24 +85,61 @@ class ExpressTransformer(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
-        train_on = torch.isnan(batch["gene_counts"])
+
+        if not self.config.train_on_all:
+            train_on = torch.isnan(batch["gene_counts"])
 
         y = self(batch)
-        y = y[:, 1:]
+        
+        if not self.config.train_on_all:
+            loss = self.loss(
+                y[:, 1:][train_on],
+                batch["gene_counts_true"][train_on],
+                gene_ids=batch["gene_index"][train_on]
+            )
+        else:
+            loss = self.loss(
+                y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
+            )
 
-        loss = F.cross_entropy(y[train_on], batch["gene_counts_true"][train_on])
+        if self.config.nce_loss:
+            nce_loss = self.nce_loss(y[:, 0])
+            loss += nce_loss
 
-        self.log("train_loss", loss, sync_dist=True)
+        if self.config.celltype_clf_loss:
+            ct_loss = self.ct_clf_loss(y[:, 0], batch["0/obs"][:, 3])
+            loss += ct_loss
+
+        
+        self.log("train_loss", loss , sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
-        train_on = torch.isnan(batch["gene_counts"])
+
+        if not self.config.train_on_all:
+            train_on = torch.isnan(batch["gene_counts"])
 
         y = self(batch)
-        y = y[:, 1:]
+        
+        if not self.config.train_on_all:
+            loss = self.loss(
+                y[:, 1:][train_on],
+                batch["gene_counts_true"][train_on],
+                gene_ids=batch["gene_index"][train_on]
+            )
+        else:
+            loss = self.loss(
+                y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
+            )
 
-        loss = F.cross_entropy(y[train_on], batch["gene_counts_true"][train_on])
+        if self.config.nce_loss:
+            nce_loss = self.nce_loss(y[:, 0])
+            loss += nce_loss
+
+        if self.config.celltype_clf_loss:
+            ct_loss = self.ct_clf_loss(y[:, 0], batch["0/obs"][:, 3])
+            loss += ct_loss
 
         self.log("val_loss", loss, sync_dist=True)
 

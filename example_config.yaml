@@ -1,11 +1,8 @@
+#DataModule args:
 data_path: "../cellxgene.h5t"
-
 batch_size: 16
-
 n_workers: 4
-
 in_memory: False
-
 return_zeros: False
 
 input_processing:
@@ -57,3 +54,44 @@ input_processing:
 
   - type: MolecularCV
     p_to_train: 0.8
+
+
+# Model args:
+discrete_input: False
+n_discrete_tokens: 10
+gate_input: False
+pseudoquant_input: False
+
+dim: 64
+depth: 4
+dropout: 0.2
+n_genes: 19331
+lr: 0.0005
+loss:
+  type: BinCE
+  n_bins: 10
+
+  #type: CountMSE
+  #exp_output: True
+  #lib_norm: False
+
+  #type: PoissonNLL
+  #lib_norm: False
+  #zero_truncated: True
+
+  #type: NegativeBinomialNLL
+  #lib_norm: False
+  #fixed_dispersion: False
+  #zero_truncated: True
+
+  #type: ZeroInflatedNegativeBinomialNLL
+  #lib_norm: False
+  #fixed_dispersion: False
+
+train_on_all: False
+
+nce_loss: True
+nce_dim: 64
+nce_temp: 1
+
+celltype_clf_loss: False
