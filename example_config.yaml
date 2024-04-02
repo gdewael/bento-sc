@@ -93,10 +93,14 @@ loss:
   #lib_norm: False
   #fixed_dispersion: False
 
-train_on_all: False
+train_on_all: True
 
-nce_loss: True
+nce_loss: False
 nce_dim: 64
 nce_temp: 1
 
 celltype_clf_loss: False
+
+modality_prediction_loss: False
+
+cls_finetune_dim: 134 # is used for both celltype clf loss and modality prediction finetuning

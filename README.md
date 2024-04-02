@@ -11,31 +11,36 @@ scRNA-seq transformer benchmarking
   - [x] Binomial split
   - [x] Gaussian noise
   - [x] Supervised celltype labeling
-- [ ] Gather some initial baselines
+- [x] Gather some initial baselines
 
 ### Baseline list
-- [ ] Celltype classification on scTab + 5 datasets from [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)
-  - [ ] VERSUS (1) unpre-trained Transformer same arch
-  - [ ] VERSUS (2) log reg
-  - [ ] VERSUS (3) NN
-  - [ ] VERSUS (4) NN[pre-trained VAE] scVI method
-- [ ] "zero-shot" Celltype clustering on scTab + 5 datasets from [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf). For procedure/metrics see [this paper](https://www.biorxiv.org/content/10.1101/2023.10.16.561085v2.full.pdf).
-  - [ ] VERSUS (1) PCA 
-  - [ ] VERSUS (2) VAE dataset specific
-- [ ] Batch Integration on Pancreas dataset see [this paper](https://www.biorxiv.org/content/10.1101/2023.10.16.561085v2.full.pdf)
-  - [ ] VERSUS? ...
-  - [ ] VERSUS? ...
-  - [ ] CHECK THIS https://openproblems.bio/results/batch_integration_embed/ scIB score
-- [ ] multiome prediction as in [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)
-  - [ ] VERSUS (1) unpre-trained Transformer same arch
-  - [ ] VERSUS (2) log reg
-  - [ ] VERSUS (3) NN
-  - [ ] VERSUS (4) NN[pre-trained VAE] scVI method
-  - [ ] ALSO CHECK THIS https://openproblems.bio/events/2022-08_neurips/
+- (1) Celltype classification on scTab test set
+  - Versus: log reg, small MLP, .. (unpre-trained transformer), pre-trained MLP (cfr scVI)
 
-- [ ] Perturbation prediction - scGPT paper does this but weirdly -- check how GEARS does it?
-  - [ ] siamese network cell 1 input cell 2 input --> prediction for each gene??
-    - [ ] Do this be comparing gene embeddings or cell embeddings?
-  - CHECK THIS https://www.kaggle.com/competitions/open-problems-single-cell-perturbations/overview/evaluation
+- (2) "Zero-shot" Celltype clustering + batch integration on great apes - human dataset (cfr. [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)). 
+  - Optionally, gather more datasets
+  - For procedure/metrics see [this paper](https://www.biorxiv.org/content/10.1101/2023.10.16.561085v2.full.pdf).
+  - Versus: PCA (on HVG or not), scVI/VAE, scVI trained on CxG
+
+- (2) Modality prediction
+  - NeurIPS 2021 Cite-seq ships with a split consisting of a test set from different donor measured at a different site.
+  - Training set-up:
+    - Standard [CLS] token embedding to predicting the modality
+  - Citation: Neurips comp dataset paper and [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)
+  - Versus: log reg, small MLP, .. (unpre-trained transformer)
+
+
+- (3) Perturbation prediction
+  - Replogle K562 Essential `"K562_essential_raw_singlecell_01.h5ad"`
+  - Filter genes that are in cellxgene census pre-training set
+  - Filter samples that correspond to perturbations of genes that are observed in both the cellxgene census pre-training set and the fine-tuning set.
+  - Training set-up:
+    - Split random perturbations to val and test set
+    - For these perturbations, use held-out set of control samples (one set for val and test)
+    - For training: randomly pair control samples to perturbed sample
+    - TODO: Tune embedding uniform init 
+  - Citation: GEARS and scGPT.
+  - Versus: Log reg, small MLP, dual encoder network, .. (unpre-trained transformer)
+
  
-Make a note on GEX reconstruction: as this is essentially what we are optimizing for, we exclude this.
+- What about GEX reconstruction?: as this is essentially what we are optimizing for, we exclude this.

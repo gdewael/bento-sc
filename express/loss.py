@@ -271,3 +271,22 @@ class CellTypeClfLoss(ExpressLoss):
     def forward(self, x, targets):
         y = self.predict(x)
         return self.loss(y, targets)
+
+class ModalityPredictionLoss(ExpressLoss):
+    def __init__(
+        self,
+        dim,
+        n_classes,
+        reduction="mean",
+    ):
+        super().__init__(dim, n_classes, reduction=reduction)
+
+    def predict(self, x):
+        return self.output_head(x)
+
+    def loss(self, inputs, targets):
+        return self.reduce(F.mse_loss(inputs, targets.to(inputs.dtype), reduction="none"))
+
+    def forward(self, x, targets):
+        y = self.predict(x)
+        return self.loss(y, targets)

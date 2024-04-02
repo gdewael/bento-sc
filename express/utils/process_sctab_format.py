@@ -8,8 +8,11 @@ from tqdm import tqdm
 import h5torch
 from scipy.sparse import csr_matrix
 import h5py
+import sys
 
-BASE_PATH = "../data/"
+
+BASE_PATH = str(sys.argv[1])
+output = str(sys.argv[2])
 
 files = [
     join(BASE_PATH, file)
@@ -90,9 +93,9 @@ splits2["test"] = splits["test"][: (len(splits["test"]) // 1024) * 1024]
 
 len_ = len(obs)
 
-f_out = h5torch.File("../cellxgene.h5t", "w")
+f_out = h5torch.File(output, "w")
 
-f = h5py.File("../data/0.h5ad")
+f = h5py.File(os.path.join(BASE_PATH, "0.h5ad"))
 mat = csr_matrix(
     (f["X/data"], f["X/indices"], f["X/indptr"]),
     shape=(f["X/indptr"].shape[0] - 1, 19331),
@@ -111,7 +114,7 @@ f.close()
 
 
 for i in tqdm(range(1, 100)):
-    f = h5py.File("../data/%s.h5ad" % i)
+    f = h5py.File(os.path.join(BASE_PATH, "%s.h5ad" % i))
     mat = csr_matrix(
         (f["X/data"], f["X/indices"], f["X/indptr"]),
         shape=(f["X/indptr"].shape[0] - 1, 19331),
@@ -123,7 +126,7 @@ for i in tqdm(range(1, 100)):
 f_out.close()
 
 
-f_out = h5torch.File("../cellxgene.h5t", "a")
+f_out = h5torch.File(output, "a")
 
 obs_ = np.stack([obs[i].cat.codes.values for i in obs.columns[2:]]).T
 categories = {
@@ -155,7 +158,7 @@ split_h5[splits2["train"]] = "train"
 split_h5[splits2["val"]] = "val"
 split_h5[splits2["test"]] = "test"
 
-f_out = h5torch.File("../cellxgene.h5t", "a")
+f_out = h5torch.File(output, "a")
 f_out.register(
     split_h5.astype(bytes), axis=0, name="split", dtype_save="bytes", dtype_load="str"
 )

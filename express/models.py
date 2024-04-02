@@ -5,7 +5,7 @@ import lightning.pytorch as pl
 from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
 from express import loss
-import yaml
+from express.utils.config import Config
 
 
 class EmbeddingGater(nn.Module):
@@ -14,8 +14,9 @@ class EmbeddingGater(nn.Module):
         self.embedding = nn.Parameter(torch.empty(dim).uniform_(-1, 1))
 
     def forward(self, x):
-        return F.tanh(x) * self.embedding
-
+        y = F.tanh(x) * self.embedding
+        y[:, 0, :] = x[:, 0, :]
+        return y
 
 class EmbeddingPseudoQuantizer(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -23,7 +24,9 @@ class EmbeddingPseudoQuantizer(nn.Module):
         self.embedding = nn.Parameter(torch.empty(in_dim, out_dim).uniform_(-1, 1))
 
     def forward(self, x):
-        return F.softmax(x, dim=-1) @ self.embedding
+        y = F.softmax(x, dim=-1) @ self.embedding
+        y[:, 0, :] = x[:, 0, :]
+        return y
 
 
 class ExpressTransformer(pl.LightningModule):
@@ -33,13 +36,18 @@ class ExpressTransformer(pl.LightningModule):
     ):
         super().__init__()
 
-        with open(config_path) as f:
-            self.config = yaml.load(f, Loader=yaml.Loader)
+
+        self.config = Config(config_path)
 
         if self.config.discrete_input:
             self.embedder = DiscreteEmbedding(self.config.n_discrete_tokens, self.config.dim, cls=True)
         else:
             self.embedder = ContinuousEmbedding(self.config.dim, cls=True)
+
+        if self.config.pseudoquant_input:
+            self.embedder = nn.Sequential(self.embedder, EmbeddingPseudoQuantizer(self.config.dim, self.config.dim))
+        elif self.config.gate_input:
+            self.embedder = nn.Sequential(self.embedder, EmbeddingGater(self.config.dim))
 
         self.transformer = TransformerEncoder(
             depth=self.config.depth,
@@ -54,9 +62,6 @@ class ExpressTransformer(pl.LightningModule):
             glu_ff=True,
             activation="gelu",
         )
-
-        self.output_head = nn.Linear(self.config.dim, self.config.n_discrete_tokens)
-        
         
         loss_mapper = {
             "BinCE": loss.BinCE,
@@ -66,6 +71,7 @@ class ExpressTransformer(pl.LightningModule):
             "ZeroInflatedNegativeBinomialNLL": loss.ZeroInflatedNegativeBinomialNLL,
 
         }
+
         type_ = self.config.loss.pop("type")
         self.loss = loss_mapper[type_](self.config.dim, **self.config.loss)
 
@@ -81,7 +87,7 @@ class ExpressTransformer(pl.LightningModule):
         mask = batch["gene_counts"] != -1
         x = self.embedder(batch["gene_counts"])
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
-        return self.output_head(z)
+        return z
 
     def training_step(self, batch, batch_idx):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
@@ -138,7 +144,7 @@ class ExpressTransformer(pl.LightningModule):
             loss += nce_loss
 
         if self.config.celltype_clf_loss:
-            ct_loss = self.ct_clf_loss(y[:, 0], batch["0/obs"][:, 3])
+            ct_loss = self.ct_clf_loss(y[:, 0], batch["0/targets"])
             loss += ct_loss
 
         self.log("val_loss", loss, sync_dist=True)
@@ -147,3 +153,93 @@ class ExpressTransformer(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
 
         return optimizer
+
+
+class PerturbTransformer(ExpressTransformer):
+    def __init__(
+        self,
+        config_path
+    ):
+        super().__init__(config_path)
+        assert self.config.nce_loss == False
+        assert self.config.celltype_clf_loss == False
+        assert self.config.train_on_all == True
+
+        self.perturbation_indicator = nn.Parameter(torch.empty(self.config.dim, self.config.dim).uniform_(-1, 1))
+    
+    def forward(self, batch):
+        mask = batch["gene_counts"] != -1
+        x = self.embedder(batch["gene_counts"])
+        matches = torch.where((batch["gene_index"].T == batch["0/perturbed_gene"]).T)
+        assert matches[0] == torch.arange(len(x))
+        x[torch.arange(len(x)), matches[1]] += self.perturbation_indicator
+        z = self.transformer(x, pos=batch["gene_index"], mask=mask)
+        return z
+
+
+    def training_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y = self(batch)
+        
+        loss = self.loss(
+            y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
+        )
+
+        self.log("train_loss", loss , sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y = self(batch)
+
+        loss = self.loss(
+            y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
+        )
+
+        self.log("val_loss", loss, sync_dist=True)
+
+class CLSTaskTransformer(ExpressTransformer):
+    def __init__(
+        self,
+        config_path
+    ):
+        super().__init__(config_path)
+        assert self.config.nce_loss == False
+        assert self.config.celltype_clf_loss == False
+        assert self.config.train_on_all == True
+        
+        if self.config.celltype_clf_loss:
+            self.loss = loss.CellTypeClfLoss(self.config.dim, self.config.cls_finetune_dim)
+        elif self.config.modality_prediction_loss:
+            self.loss = loss.ModalityPredictionLoss(self.config.dim, self.config.cls_finetune_dim)
+        else:
+            raise ValueError("At least one of celltype clf loss or modality predict loss should be true")
+
+
+    def forward(self, batch):
+        mask = batch["gene_counts"] != -1
+        x = self.embedder(batch["gene_counts"])
+        z = self.transformer(x, pos=batch["gene_index"], mask=mask)
+        return z
+
+
+    def training_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y = self(batch)
+    
+        loss = self.loss(y[:, 0], batch["0/targets"].to(self.dtype))
+        
+        self.log("train_loss", loss , sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y = self(batch)
+    
+        loss = self.loss(y[:, 0], batch["0/targets"].to(self.dtype))
+
+        self.log("val_loss", loss, sync_dist=True)

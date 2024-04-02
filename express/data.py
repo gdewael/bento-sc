@@ -7,15 +7,15 @@ from importlib.resources import files
 from torch.distributions.binomial import Binomial
 from torch.distributions.poisson import Poisson
 from torch.distributions.normal import Normal
-import yaml
 from einops import rearrange
+from h5torch.dataset import sample_csr
+from express.utils.config import Config
 
 
 class ExpressDataModule(LightningDataModule):
     def __init__(self, config_path):
         super().__init__()
-        with open(config_path) as f:
-            self.config = yaml.load(f, Loader=yaml.Loader)
+        self.config = Config(config_path)
 
     def setup(self, stage):
 
@@ -44,22 +44,38 @@ class ExpressDataModule(LightningDataModule):
             processor = []
         processor = SequentialPreprocessor(*processor)
 
+        if not self.config.perturb_mode:
+            processing_class = CellSampleProcessor
+        else:
+            processing_class = PerturbationCellSampleProcessor
+
+        f = h5torch.File(self.config["data_path"])
+
+        if self.config["in_memory"]:
+            f = f.to_dict()
+
         self.train = h5torch.Dataset(
-            self.config["data_path"],
-            sample_processor=CellSampleProcessor(
+            f,
+            sample_processor=processing_class(
                 processor, return_zeros=self.config["return_zeros"]
             ),
-            in_memory=self.config["in_memory"],
             subset=("0/split", "train"),
         )
 
         self.val = h5torch.Dataset(
-            self.config["data_path"],
-            sample_processor=CellSampleProcessor(
+            f,
+            sample_processor=processing_class(
                 processor, return_zeros=self.config["return_zeros"]
             ),
-            in_memory=self.config["in_memory"],
             subset=("0/split", "val"),
+        )
+
+        self.test = h5torch.Dataset(
+            f,
+            sample_processor=processing_class(
+                processor, return_zeros=self.config["return_zeros"]
+            ),
+            subset=("0/split", "test"),
         )
 
     def train_dataloader(self):
@@ -94,7 +110,11 @@ class CellSampleProcessor:
         if self.return_zeros:
             gene_counts = np.zeros(self.n_genes)
             gene_counts[sample["central"][0]] = sample["central"][1]
-            sample |= {"gene_counts": gene_counts, "gene_counts_true": gene_counts}
+            sample |= {
+                "gene_counts": torch.tensor(gene_counts),
+                "gene_counts_true": torch.tensor(gene_counts),
+                "gene_index" : torch.arange(self.n_genes),
+            }
         else:
             asort = np.argsort(
                 sample["central"][1] + np.random.rand(len(sample["central"][1]))
@@ -108,7 +128,42 @@ class CellSampleProcessor:
             }
 
         _ = sample.pop("central")
-        sample = self.processor(sample)
+        if self.processor is not None:
+            sample = self.processor(sample)
+        return sample
+    
+
+class PerturbationCellSampleProcessor:
+    def __init__(self, processor, return_zeros=True, n_genes=19331):
+        assert return_zeros == True, "return zeros has to be true for perturbation modeling. Control genes true FilterTop or FilterHVG"
+
+        self.processor = processor
+        self.n_genes = n_genes
+
+    def __call__(self, f, sample):
+        gene_counts = np.zeros(self.n_genes)
+        gene_counts[sample["central"][0]] = sample["central"][1]
+        sample |= {
+                "gene_counts_true": torch.tensor(gene_counts),
+                "gene_index" : torch.arange(self.n_genes),
+            }
+        
+        if sample["0/split"] != "train":
+            control_sample = sample_csr(f["central"], sample["0/matched_control"])
+
+        else:
+            train_control_indices = f["unstructured/train_control_indices"][:]
+            sampled_control = np.random.choice(train_control_indices)
+            control_sample = sample_csr(f["central"], sampled_control)
+
+        gene_counts = np.zeros(self.n_genes)
+        gene_counts[control_sample[0]] = control_sample[1]
+        sample["gene_counts"] = torch.tensor(gene_counts)
+
+
+        _ = sample.pop("central")
+        if self.processor is not None:
+            sample = self.processor(sample)
         return sample
 
 
@@ -190,13 +245,21 @@ class FilterTopGenes:
         self,
         number=1024,
         affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
+        key_to_determine_top="gene_counts"
     ):
         self.n = number
         self.affected_keys = affected_keys
+        self.topkey = key_to_determine_top
 
     def __call__(self, sample):
-        for a in self.affected_keys:
-            sample[a] = sample[a][..., : self.n]
+        if sample[self.affected_keys[0]].ndim == 1:
+            to_select = torch.argsort(sample[self.topkey]).flip(0)[:self.n]
+            for a in self.affected_keys:
+                sample[a] = sample[a][to_select]
+        else:
+            to_select = torch.argsort(sample[self.topkey]).fliplr()[:, :self.n]
+            for a in self.affected_keys:
+                sample[a] = sample[a][torch.arange(2).unsqueeze(-1), to_select]
         return sample
 
 
@@ -334,9 +397,22 @@ class SequentialPreprocessor:
 
 def batch_collater(batch):
     batch_collated = {}
-
-    batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
+    
     batch_collated["0/split"] = [b["0/split"] for b in batch]
+
+    if "0/obs" in batch[0]:
+        batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
+
+    if "0/perturbed_gene" in batch[0]:
+        batch_collated["0/perturbed_gene"] = torch.tensor(np.array([b["0/perturbed_gene"] for b in batch])).long()
+
+    if "0/ADT" in batch[0]:
+        batch_collated["0/targets"] = torch.tensor(np.array([b["0/ADT"] for b in batch]))
+    elif ("0/obs" in batch[0]) and (batch[0]["0/obs"].shape[0] == 9):
+        # essentially hardcoded to detect the cellxgene pre-training set this way
+        # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
+        batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
+
 
     for name, padval in zip(
         ["gene_index", "gene_counts", "gene_counts_true"], [0, -1, -1]
@@ -361,6 +437,7 @@ def batch_collater(batch):
 
     if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
         batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
-        batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
+        if "0/obs" in batch_collated:
+            batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
         
     return batch_collated
