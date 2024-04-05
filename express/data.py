@@ -33,6 +33,7 @@ class ExpressDataModule(LightningDataModule):
             "BinomialSubsample": BinomialSubsample,
             "Mask": Mask,
             "MolecularCV": MolecularCV,
+            "CountsAsPositions": CountsAsPositions,
         }
 
         if "input_processing" in self.config:
@@ -93,8 +94,18 @@ class ExpressDataModule(LightningDataModule):
             self.val,
             num_workers=self.config["n_workers"],
             batch_size=self.config["batch_size"],
-            shuffle=True,
-            pin_memory=False,
+            shuffle=False,
+            pin_memory=True,
+            collate_fn=batch_collater,
+        )
+
+    def test_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.test,
+            num_workers=self.config["n_workers"],
+            batch_size=self.config["batch_size"],
+            shuffle=False,
+            pin_memory=True,
             collate_fn=batch_collater,
         )
 
@@ -135,10 +146,17 @@ class CellSampleProcessor:
 
 class PerturbationCellSampleProcessor:
     def __init__(self, processor, return_zeros=True, n_genes=19331):
-        assert return_zeros == True, "return zeros has to be true for perturbation modeling. Control genes true FilterTop or FilterHVG"
+        assert return_zeros == True, "return zeros has to be true for perturbation modeling."
 
         self.processor = processor
+        self.processor_trues = SequentialPreprocessor(
+            CountsPerX(factor=10_000, key="gene_counts_true"),
+            LogP1(key="gene_counts_true"),
+
+        )
         self.n_genes = n_genes
+        path = files("express.utils").joinpath("gene_set_perturb.txt")
+        self.gene_indices = torch.tensor(np.loadtxt(path).astype(int))
 
     def __call__(self, f, sample):
         gene_counts = np.zeros(self.n_genes)
@@ -164,6 +182,13 @@ class PerturbationCellSampleProcessor:
         _ = sample.pop("central")
         if self.processor is not None:
             sample = self.processor(sample)
+
+        sample = self.processor_trues(sample)
+
+        sample["gene_counts"] = sample["gene_counts"][self.gene_indices]
+        sample["gene_counts_true"] = sample["gene_counts_true"][self.gene_indices]
+        sample["gene_index"] = self.gene_indices
+
         return sample
 
 
@@ -172,7 +197,7 @@ class RankCounts:
         self.key = key
 
     def __call__(self, sample):
-        sample[self.key] = torch.argsort(sample[self.key])
+        sample[self.key] = torch.argsort(sample[self.key], descending=True)
         return sample
 
 
@@ -267,15 +292,19 @@ class FilterHVG:
     def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024):
         path = files("express.utils").joinpath("hvg.npy")
         var = np.load(path)
-        self.to_select = np.argsort(var)[::-1][:number]
+        self.to_select = torch.tensor(np.argsort(var)[::-1][:number])
         self.affected_keys = affected_keys
 
     def __call__(self, sample):
         if sample[self.affected_keys[0]].ndim == 1:
+            len_ = len(sample[self.affected_keys[0]])
+            assert len_ == 19331
             indices = torch.argsort(sample["gene_index"])[self.to_select]
             for a in self.affected_keys:
                 sample[a] = sample[a][indices]
         else:
+            len_ = len(sample[self.affected_keys[0]][0])
+            assert len_ == 19331
             indices = torch.argsort(sample["gene_index"])[:, self.to_select]
             for a in self.affected_keys:
                 sample[a] = sample[a][torch.arange(2).unsqueeze(-1), indices]
@@ -335,7 +364,26 @@ class PoissonResample:
             resampled = torch.clamp(resampled, min=1)
         sample[self.key] = resampled
         return sample
-
+    
+class CountsAsPositions:
+    def __init__(self):
+        """
+        Used for Geneformer-style pre-training:
+            - Gene index: RankCounts Gene counts
+            - Gene counts true: Gene index
+            - Gene counts: Gene index
+        Make sure these have been run before performing this step:
+            RankCounts gene counts
+            FilterTop
+        """
+        pass
+    def __call__(self, sample):
+        gene_index = sample["gene_index"].clone()
+        gene_counts = sample["gene_counts"].clone()
+        sample["gene_index"] = gene_counts
+        sample["gene_counts"] = gene_index
+        sample["gene_counts_true"] = gene_index
+        return sample
 
 class GaussianResample:
     def __init__(self, key="gene_counts", std=1):

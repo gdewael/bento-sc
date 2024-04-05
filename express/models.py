@@ -6,7 +6,8 @@ from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
 from express import loss
 from express.utils.config import Config
-
+from scipy.stats import spearmanr
+import numpy as np
 
 class EmbeddingGater(nn.Module):
     def __init__(self, dim):
@@ -164,14 +165,16 @@ class PerturbTransformer(ExpressTransformer):
         assert self.config.nce_loss == False
         assert self.config.celltype_clf_loss == False
         assert self.config.train_on_all == True
+        assert isinstance(self.loss, loss.CountMSE)
 
-        self.perturbation_indicator = nn.Parameter(torch.empty(self.config.dim, self.config.dim).uniform_(-1, 1))
-    
+        self.perturbation_indicator = nn.Parameter(torch.empty(self.config.dim).uniform_(-1, 1))
+        self.validation_step_outputs = []
+
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
         x = self.embedder(batch["gene_counts"])
         matches = torch.where((batch["gene_index"].T == batch["0/perturbed_gene"]).T)
-        assert matches[0] == torch.arange(len(x))
+        assert (matches[0] == torch.arange(len(x)).to(matches[0].device)).all()
         x[torch.arange(len(x)), matches[1]] += self.perturbation_indicator
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
         return z
@@ -199,6 +202,31 @@ class PerturbTransformer(ExpressTransformer):
         )
 
         self.log("val_loss", loss, sync_dist=True)
+
+        y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
+        
+        self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu()))
+
+    def on_validation_epoch_end(self):
+        all_preds = torch.cat([s[0] for s in self.validation_step_outputs])
+        all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
+        print(all_preds.shape, all_trues.shape)
+        spearmans = []
+        for i in range(5000):
+            s = spearmanr(all_preds[:, i].float().numpy(), all_trues[:, i].float().numpy()).statistic
+            spearmans.append(s)
+
+        self.log("val_spearman", np.mean(spearmans))
+
+        self.validation_step_outputs.clear()
+
+
+    def predict_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y = self(batch)
+        y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
+        return (y, batch["gene_counts_true"], batch["gene_index"])
 
 class CLSTaskTransformer(ExpressTransformer):
     def __init__(

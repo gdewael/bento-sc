@@ -21,7 +21,7 @@ input_processing:
     key: "gene_counts"
 
   - type: Bin
-    bins: "../express/express/utils/bins50.txt"
+    bins: "../express/express/utils/bins50.txt" # 50->9 , 100->13, 200->19, 500->29
     key: "gene_counts"
 
   - type: DuplicateCells
@@ -63,7 +63,7 @@ input_processing:
 
 # Model args:
 discrete_input: False
-n_discrete_tokens: 10
+n_discrete_tokens: 10 # 50->9 , 100->13, 200->19, 500->29
 gate_input: False
 pseudoquant_input: False
 
@@ -74,7 +74,7 @@ n_genes: 19331
 lr: 0.0005
 loss:
   type: BinCE
-  n_bins: 10
+  n_bins: 10 
 
   #type: CountMSE
   #exp_output: True
@@ -100,7 +100,5 @@ nce_dim: 64
 nce_temp: 1
 
 celltype_clf_loss: False
-
 modality_prediction_loss: False
-
 cls_finetune_dim: 134 # is used for both celltype clf loss and modality prediction finetuning

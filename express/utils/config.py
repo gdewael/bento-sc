@@ -11,6 +11,4 @@ class Config(dict):
     
     def __getattr__(self, name):
         value = self[name]
-        #if isinstance(value, dict):
-        #    value = Config(**value)
         return value

@@ -38,9 +38,14 @@ scRNA-seq transformer benchmarking
     - Split random perturbations to val and test set
     - For these perturbations, use held-out set of control samples (one set for val and test)
     - For training: randomly pair control samples to perturbed sample
+    - Predicted gene exp is always LogP1
     - TODO: Tune embedding uniform init 
   - Citation: GEARS and scGPT.
   - Versus: Log reg, small MLP, dual encoder network, .. (unpre-trained transformer)
 
  
 - What about GEX reconstruction?: as this is essentially what we are optimizing for, we exclude this.
+
+
+## Notes on code structure
+All data are loaded in as counts via `h5torch`-compatible HDF5 files. In the Dataset object, the cell measurements are preprocessed using custom class objects, which can be extended with any kind of per-sample preprocessing.

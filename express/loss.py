@@ -22,7 +22,7 @@ class ExpressLoss(nn.Module):
     def forward(self, *args):
         raise NotImplementedError
 
-    def loss(self, *args):
+    def loss(self, *args): 
         raise NotImplementedError
 
 
@@ -62,7 +62,7 @@ class CountMSE(ExpressLoss):
 
     def forward(self, x, targets, **kwargs):
         y = self.predict(x, libsize=targets.sum())
-        return self.loss(y, targets)
+        return self.loss(y, targets.to(y.dtype))
 
 
 class PoissonNLL(ExpressLoss):
