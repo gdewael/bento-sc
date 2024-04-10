@@ -36,7 +36,7 @@ class ExpressTransformer(pl.LightningModule):
         config_path
     ):
         super().__init__()
-
+        self.save_hyperparameters()
 
         self.config = Config(config_path)
 
@@ -186,7 +186,7 @@ class PerturbTransformer(ExpressTransformer):
         y = self(batch)
         
         loss = self.loss(
-            y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
+            y[:, 1:], batch["gene_counts_copy"]-batch["gene_counts_true"], gene_ids=batch["gene_index"]
         )
 
         self.log("train_loss", loss , sync_dist=True)
@@ -198,25 +198,34 @@ class PerturbTransformer(ExpressTransformer):
         y = self(batch)
 
         loss = self.loss(
-            y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
+            y[:, 1:], batch["gene_counts_copy"]-batch["gene_counts_true"], gene_ids=batch["gene_index"]
         )
 
         self.log("val_loss", loss, sync_dist=True)
 
         y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
         
-        self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu()))
+        self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu(), batch["gene_counts_copy"].cpu()))
 
     def on_validation_epoch_end(self):
         all_preds = torch.cat([s[0] for s in self.validation_step_outputs])
         all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
-        print(all_preds.shape, all_trues.shape)
-        spearmans = []
-        for i in range(5000):
-            s = spearmanr(all_preds[:, i].float().numpy(), all_trues[:, i].float().numpy()).statistic
-            spearmans.append(s)
+        all_origs = torch.cat([s[2] for s in self.validation_step_outputs])
+        true_expr_change = all_origs - all_trues
+        pred_expr_change = all_origs - all_preds
 
+        delta_spearmans = []
+        for i in range(len(true_expr_change)):
+            s = spearmanr(pred_expr_change[i].float().numpy(), true_expr_change[i].float().numpy()).statistic
+            delta_spearmans.append(s)
+        self.log("val_deltaspearman", np.mean(delta_spearmans))
+
+        spearmans = []
+        for i in range(len(true_expr_change)):
+            s = spearmanr(all_preds[i].float().numpy(), all_trues[i].float().numpy()).statistic
+            spearmans.append(s)
         self.log("val_spearman", np.mean(spearmans))
+
 
         self.validation_step_outputs.clear()
 
@@ -226,7 +235,7 @@ class PerturbTransformer(ExpressTransformer):
 
         y = self(batch)
         y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
-        return (y, batch["gene_counts_true"], batch["gene_index"])
+        return (y, batch["gene_counts_true"], batch["gene_counts_copy"], batch["gene_index"])
 
 class CLSTaskTransformer(ExpressTransformer):
     def __init__(

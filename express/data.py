@@ -34,6 +34,7 @@ class ExpressDataModule(LightningDataModule):
             "Mask": Mask,
             "MolecularCV": MolecularCV,
             "CountsAsPositions": CountsAsPositions,
+            "Copy": Copy,
         }
 
         if "input_processing" in self.config:
@@ -154,6 +155,13 @@ class PerturbationCellSampleProcessor:
             LogP1(key="gene_counts_true"),
 
         )
+
+        self.processor_origs = SequentialPreprocessor(
+            Copy(key="gene_counts", to="gene_counts_copy"),
+            CountsPerX(factor=10_000, key="gene_counts_copy"),
+            LogP1(key="gene_counts_copy"),
+        )
+
         self.n_genes = n_genes
         path = files("express.utils").joinpath("gene_set_perturb.txt")
         self.gene_indices = torch.tensor(np.loadtxt(path).astype(int))
@@ -178,13 +186,16 @@ class PerturbationCellSampleProcessor:
         gene_counts[control_sample[0]] = control_sample[1]
         sample["gene_counts"] = torch.tensor(gene_counts)
 
-
         _ = sample.pop("central")
+
+        sample = self.processor_origs(sample)
+
         if self.processor is not None:
             sample = self.processor(sample)
 
         sample = self.processor_trues(sample)
 
+        sample["gene_counts_copy"] = sample["gene_counts_copy"][self.gene_indices]
         sample["gene_counts"] = sample["gene_counts"][self.gene_indices]
         sample["gene_counts_true"] = sample["gene_counts_true"][self.gene_indices]
         sample["gene_index"] = self.gene_indices
@@ -365,6 +376,15 @@ class PoissonResample:
         sample[self.key] = resampled
         return sample
     
+class Copy:
+    def __init__(self, key="gene_counts", to="gene_counts_copy"):
+        self.key = key
+        self.to = to
+
+    def __call__(self, sample):
+        sample[self.to] = sample[self.key].clone()
+        return sample
+    
 class CountsAsPositions:
     def __init__(self):
         """
@@ -461,9 +481,14 @@ def batch_collater(batch):
         # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
         batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
 
+    counts_keys = ["gene_index", "gene_counts", "gene_counts_true"]
+    append_value = [0, -1, -1]
+    if "gene_counts_copy" in batch[0]:
+        counts_keys.append("gene_counts_copy")
+        append_value.append(-1)
 
     for name, padval in zip(
-        ["gene_index", "gene_counts", "gene_counts_true"], [0, -1, -1]
+        counts_keys, append_value
     ):
 
         if batch[0][name].ndim == 1:
