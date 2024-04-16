@@ -243,7 +243,7 @@ class NCELoss(ExpressLoss):
         n = len(inputs)
         targets = torch.arange(n).view(n // 2, 2).fliplr().view(n)
 
-        inputs = F.normalize(inputs)
+        inputs = F.normalize(inputs, dim = -1)
         inputs = (inputs @ inputs.T) / self.t
         inputs.fill_diagonal_(float("-inf"))
         return self.reduce(F.cross_entropy(inputs, targets, reduction="none"))
