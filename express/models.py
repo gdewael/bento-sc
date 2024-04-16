@@ -8,6 +8,7 @@ from express import loss
 from scipy.stats import spearmanr
 from torchmetrics.classification import MulticlassAccuracy
 import numpy as np
+from copy import deepcopy
 
 class EmbeddingGater(nn.Module):
     def __init__(self, dim):
@@ -38,7 +39,7 @@ class ExpressTransformer(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.config = config
+        self.config = deepcopy(config)
 
         if self.config.discrete_input:
             self.embedder = DiscreteEmbedding(self.config.n_discrete_tokens, self.config.dim, cls=True)

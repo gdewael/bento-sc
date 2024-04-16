@@ -13,7 +13,7 @@ from h5torch.dataset import sample_csr
 class ExpressDataModule(LightningDataModule):
     def __init__(self, config):
         super().__init__()
-        self.config = config
+        self.config = deepcopy(config)
 
     def setup(self, stage):
 

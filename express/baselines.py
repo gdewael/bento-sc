@@ -7,7 +7,7 @@ from express import loss
 from scipy.stats import spearmanr
 import numpy as np
 from torchmetrics.classification import MulticlassAccuracy
-
+from copy import deepcopy
 
 class Permute(nn.Module): 
     def __init__(self, *args):
@@ -33,7 +33,7 @@ class PerturbBaseline(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.config = config
+        self.config = deepcopy(config)
         dim_per_gene = self.config.baseline_perturb_dim_per_gene
         bottleneck_dim = self.config.baseline_perturb_bottleneck_dim
 
@@ -135,7 +135,7 @@ class CLSTaskBaseline(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.config = config
+        self.config = deepcopy(config)
         layers = self.config.baseline_cls_task_layers
 
         if layers == []:
