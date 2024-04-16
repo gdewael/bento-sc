@@ -7,6 +7,7 @@ from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
 from express import loss
 from express.utils.config import Config
 from scipy.stats import spearmanr
+from torchmetrics.classification import MulticlassAccuracy
 import numpy as np
 
 class EmbeddingGater(nn.Module):
@@ -86,6 +87,8 @@ class ExpressTransformer(pl.LightningModule):
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
+        if torch.all(mask):
+            mask = None
         x = self.embedder(batch["gene_counts"])
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
         return z
@@ -172,10 +175,15 @@ class PerturbTransformer(ExpressTransformer):
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
+        if torch.all(mask):
+            mask = None
+
         x = self.embedder(batch["gene_counts"])
+
         matches = torch.where((batch["gene_index"].T == batch["0/perturbed_gene"]).T)
         assert (matches[0] == torch.arange(len(x)).to(matches[0].device)).all()
         x[torch.arange(len(x)), matches[1]] += self.perturbation_indicator
+
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
         return z
 
@@ -211,21 +219,20 @@ class PerturbTransformer(ExpressTransformer):
         all_preds = torch.cat([s[0] for s in self.validation_step_outputs])
         all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
         all_origs = torch.cat([s[2] for s in self.validation_step_outputs])
-        true_expr_change = all_origs - all_trues
-        pred_expr_change = all_origs - all_preds
+        true_expr_change = all_trues - all_origs
+        pred_expr_change = all_preds - all_origs
 
         delta_spearmans = []
         for i in range(len(true_expr_change)):
             s = spearmanr(pred_expr_change[i].float().numpy(), true_expr_change[i].float().numpy()).statistic
             delta_spearmans.append(s)
-        self.log("val_deltaspearman", np.mean(delta_spearmans))
+        self.log("val_deltaspearman(IC)", np.mean(delta_spearmans), sync_dist=True)
 
         spearmans = []
         for i in range(len(true_expr_change)):
             s = spearmanr(all_preds[i].float().numpy(), all_trues[i].float().numpy()).statistic
             spearmans.append(s)
-        self.log("val_spearman", np.mean(spearmans))
-
+        self.log("val_spearman(IC)", np.mean(spearmans), sync_dist=True)
 
         self.validation_step_outputs.clear()
 
@@ -244,8 +251,6 @@ class CLSTaskTransformer(ExpressTransformer):
     ):
         super().__init__(config_path)
         assert self.config.nce_loss == False
-        assert self.config.celltype_clf_loss == False
-        assert self.config.train_on_all == True
         
         if self.config.celltype_clf_loss:
             self.loss = loss.CellTypeClfLoss(self.config.dim, self.config.cls_finetune_dim)
@@ -254,12 +259,19 @@ class CLSTaskTransformer(ExpressTransformer):
         else:
             raise ValueError("At least one of celltype clf loss or modality predict loss should be true")
 
+        self.validation_step_outputs = []
+
+        if self.config.celltype_clf_loss:
+            self.micro_acc = MulticlassAccuracy(num_classes=self.config.cls_finetune_dim, average="micro")
+            self.macro_acc = MulticlassAccuracy(num_classes=self.config.cls_finetune_dim, average="macro")
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
+        if torch.all(mask):
+            mask = None
         x = self.embedder(batch["gene_counts"])
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
-        return z
+        return self.loss.predict(z[:, 0])
 
 
     def training_step(self, batch, batch_idx):
@@ -267,7 +279,7 @@ class CLSTaskTransformer(ExpressTransformer):
 
         y = self(batch)
     
-        loss = self.loss(y[:, 0], batch["0/targets"].to(self.dtype))
+        loss = self.loss.loss(y, batch["0/targets"])
         
         self.log("train_loss", loss , sync_dist=True)
         return loss
@@ -277,6 +289,40 @@ class CLSTaskTransformer(ExpressTransformer):
 
         y = self(batch)
     
-        loss = self.loss(y[:, 0], batch["0/targets"].to(self.dtype))
+        loss = self.loss.loss(y, batch["0/targets"])
 
         self.log("val_loss", loss, sync_dist=True)
+        if self.config.celltype_clf_loss:
+            self.micro_acc(y, batch["0/targets"])
+            self.macro_acc(y, batch["0/targets"])
+            self.log(
+                "val_microacc",
+                self.micro_acc,
+                on_step=False,
+                on_epoch=True,
+                batch_size=len(batch["0/targets"]),
+                sync_dist=True,
+            )
+            self.log(
+                "val_macroacc",
+                self.macro_acc,
+                on_step=False,
+                on_epoch=True,
+                batch_size=len(batch["0/targets"]),
+                sync_dist=True,
+            )
+
+        self.validation_step_outputs.append((y.cpu(), batch["0/targets"].cpu()))
+
+    def on_validation_epoch_end(self):
+        all_preds = torch.cat([s[0] for s in self.validation_step_outputs])
+        all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
+
+        if isinstance(self.loss, loss.ModalityPredictionLoss):
+            spearmans = []
+            for i in range(all_preds.shape[1]):
+                s = spearmanr(all_preds[:, i].float().numpy(), all_trues[:, i].float().numpy()).statistic
+                spearmans.append(s)
+            self.log("val_macro_spearman", np.mean(spearmans), sync_dist=True)
+
+        self.validation_step_outputs.clear()

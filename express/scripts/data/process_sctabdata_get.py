@@ -5,6 +5,9 @@ from tqdm.auto import tqdm
 import obonet
 import networkx
 import cellxgene_census
+import sys
+
+BASE_PATH = str(sys.argv[1])
 
 # url = 'http://purl.obolibrary.org/obo/cl/cl-simple.obo'
 url = "https://github.com/obophenotype/cell-ontology/releases/download/v2023-05-22/cl-simple.obo"
@@ -130,7 +133,6 @@ protein_coding_genes = pd.read_parquet(
     "https://raw.githubusercontent.com/theislab/scTab/devel/notebooks/store_creation/features.parquet"
 ).gene_names.tolist()
 
-BASE_PATH = "../data/"
 
 # download in batches to not run out of memory
 for i, idxs in tqdm(enumerate(np.array_split(obs_subset.soma_joinid.to_numpy(), 100))):

@@ -285,7 +285,7 @@ class ModalityPredictionLoss(ExpressLoss):
         return self.output_head(x)
 
     def loss(self, inputs, targets):
-        return self.reduce(F.mse_loss(inputs, targets.to(inputs.dtype), reduction="none"))
+        return self.reduce(F.mse_loss(inputs, torch.log1p(targets.to(inputs.dtype)), reduction="none"))
 
     def forward(self, x, targets):
         y = self.predict(x)

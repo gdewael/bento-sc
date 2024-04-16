@@ -35,6 +35,7 @@ class ExpressDataModule(LightningDataModule):
             "MolecularCV": MolecularCV,
             "CountsAsPositions": CountsAsPositions,
             "Copy": Copy,
+            "FilterHVG": FilterHVG,
         }
 
         if "input_processing" in self.config:
@@ -72,6 +73,14 @@ class ExpressDataModule(LightningDataModule):
             subset=("0/split", "val"),
         )
 
+        self.val_sub = h5torch.Dataset(
+            f,
+            sample_processor=processing_class(
+                processor, return_zeros=self.config["return_zeros"]
+            ),
+            subset=("0/split", "val_sub"),
+        )
+
         self.test = h5torch.Dataset(
             f,
             sample_processor=processing_class(
@@ -93,6 +102,16 @@ class ExpressDataModule(LightningDataModule):
     def val_dataloader(self):
         return torch.utils.data.DataLoader(
             self.val,
+            num_workers=self.config["n_workers"],
+            batch_size=self.config["batch_size"],
+            shuffle=False,
+            pin_memory=True,
+            collate_fn=batch_collater,
+        )
+    
+    def val_sub_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.val_sub,
             num_workers=self.config["n_workers"],
             batch_size=self.config["batch_size"],
             shuffle=False,
@@ -163,7 +182,7 @@ class PerturbationCellSampleProcessor:
         )
 
         self.n_genes = n_genes
-        path = files("express.utils").joinpath("gene_set_perturb.txt")
+        path = files("express.utils.data").joinpath("gene_set_perturb.txt")
         self.gene_indices = torch.tensor(np.loadtxt(path).astype(int))
 
     def __call__(self, f, sample):
@@ -300,10 +319,12 @@ class FilterTopGenes:
 
 
 class FilterHVG:
-    def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024):
-        path = files("express.utils").joinpath("hvg.npy")
+    def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024, dataset="cellxgene"):
+        assert dataset in ["cellxgene", "citeseq", "greatapes"]
+        path = files("express.utils.data").joinpath("hvg_%s.npy" % dataset)
         var = np.load(path)
-        self.to_select = torch.tensor(np.argsort(var)[::-1][:number])
+        asort = np.argsort(var)[::-1][:number]
+        self.to_select = torch.sort(torch.tensor(asort.copy())).values 
         self.affected_keys = affected_keys
 
     def __call__(self, sample):
@@ -332,7 +353,7 @@ class FilterRandomGenes:
         self.n = number
         self.affected_keys = affected_keys
         if proportional_hvg:
-            path = files("express.utils").joinpath("hvg.npy")
+            path = files("express.utils.data").joinpath("hvg_cellxgene.npy")
             var = np.load(path)
             self.p = np.exp(np.log10(var+1e-8)/5)/np.exp(np.log10(var+1e-8)/5).sum()
         self.proportional_hvg = proportional_hvg

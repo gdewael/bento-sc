@@ -97,10 +97,11 @@ f_out = h5torch.File(output, "w")
 
 f = h5py.File(os.path.join(BASE_PATH, "0.h5ad"))
 mat = csr_matrix(
-    (f["X/data"], f["X/indices"], f["X/indptr"]),
+    (f["X/data"], f["X/indices"], f["X/indptr"].astype(np.int64)),
     shape=(f["X/indptr"].shape[0] - 1, 19331),
 )
 mat.indices = mat.indices.astype("int16")
+mat.indptr = mat.indptr.astype("int64")
 f_out.register(
     mat,
     axis="central",
@@ -120,6 +121,7 @@ for i in tqdm(range(1, 100)):
         shape=(f["X/indptr"].shape[0] - 1, 19331),
     )
     mat.indices = mat.indices.astype("int16")
+    mat.indptr = mat.indptr.astype("int64")
     f_out.append(mat, "central")
     f.close()
 
@@ -157,6 +159,9 @@ split_h5 = np.full(len(obs), "NA", dtype=object)
 split_h5[splits2["train"]] = "train"
 split_h5[splits2["val"]] = "val"
 split_h5[splits2["test"]] = "test"
+
+val_sub = np.random.permutation(splits2["val"])[:100_000]
+split_h5[val_sub] = "val_sub"
 
 f_out = h5torch.File(output, "a")
 f_out.register(

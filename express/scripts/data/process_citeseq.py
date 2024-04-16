@@ -5,7 +5,11 @@ import pandas as pd
 from tqdm import tqdm
 import h5torch
 
-f = h5py.File("../GSE194122_openproblems_neurips2021_cite_BMMC_processed.h5ad")
+INPUT_FILE = "/data/home/gaetandw/express/data/GSE194122_openproblems_neurips2021_cite_BMMC_processed.h5ad"
+OUTPUT_FILE = "/data/home/gaetandw/express/data/citeseq2.h5t"
+CXG_FILE = "/data/home/gaetandw/express/data/cellxgene.h5t"
+
+f = h5py.File(INPUT_FILE)
 f.visititems(print)
 
 central = f["layers/counts"]
@@ -28,7 +32,7 @@ gene_ids = f["var/__categories/gene_id"][:][f["var/gene_id"][:]]
 gene_ids_gex = gene_ids[GEX_columns]
 gene_ids_adt = gene_ids[ADT_columns]
 
-f_cxg = h5py.File("../data/cellxgene.h5t")
+f_cxg = h5py.File(CXG_FILE)
 gene_ids_cxg = f_cxg["1/var"][:, 0]
 
 indices_map = []
@@ -40,13 +44,13 @@ for g_id in gene_ids_gex:
         indices_map.append(np.nan)
 indices_map = np.array(indices_map)
 
-new_matrix = np.zeros((matrix.shape[0], 19331), dtype="int16")
+new_matrix = np.zeros((matrix.shape[0], 19331), dtype="int32")
 for ix, l in tqdm(enumerate(indices_map)):
     if ~np.isnan(l):
         new_matrix[:, l.astype(int)] = GEX_matrix[:, ix]
 
 
-f = h5torch.File("../citeseq.h5t", "w")
+f = h5torch.File(OUTPUT_FILE, "w")
 
 f.register(
     csr_matrix(new_matrix),

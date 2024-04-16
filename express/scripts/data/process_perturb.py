@@ -35,8 +35,8 @@ for g_id in gene_ids_pert_samples:
 sample_filter = np.array(sample_filter, dtype="object")
 
 
-matrix = f["X"][:].astype("int16")
-new_matrix = np.zeros((310385, 19331), dtype="int16")
+matrix = f["X"][:].astype("int32")
+new_matrix = np.zeros((310385, 19331), dtype="int32")
 for ix, l in tqdm(enumerate(indices_map)):
     if ~np.isnan(l):
         new_matrix[:, l.astype(int)] = matrix[:, ix]
@@ -56,7 +56,7 @@ for ff in f["obs/gene_id"][:]:
 
 new_pert_array = np.array(new_pert_array, allow_pickle=True)
 
-splits = np.load("../express/express/utils/split_pert.npz")
+splits = np.load("../express/express/utils/data/split_pert.npz")
 split = splits["split"]
 matched_control = splits["matched_control"]
 train_control_indices = splits["train_control_indices"]

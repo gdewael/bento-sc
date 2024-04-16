@@ -12,3 +12,12 @@ class Config(dict):
     def __getattr__(self, name):
         value = self[name]
         return value
+    
+    def write(self, path):
+        with open(path, 'w') as outfile:
+            yaml.dump(dict(self), outfile, default_flow_style=False, sort_keys=False)
+
+    def change_keys(self, **kwargs):
+        for k, v in kwargs.items():
+            self[k] = v
+

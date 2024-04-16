@@ -36,7 +36,7 @@ trainer = Trainer(
     check_val_every_n_epoch=None,
     callbacks=callbacks,
     logger=logger,
-    precision="bf16-mixed",
+    precision="bf16-true",
 )
 
 trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())

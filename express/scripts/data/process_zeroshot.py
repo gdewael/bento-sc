@@ -4,9 +4,9 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from tqdm import tqdm
 
-INPUT_FILE = "great_apes.h5ad"
-OUTPUT_FILE = "../great_apes.h5t"
-CXG_FILE = "../data/cellxgene.h5t"
+INPUT_FILE = "/data/home/gaetandw/express/data/great_apes.h5ad"
+OUTPUT_FILE = "/data/home/gaetandw/express/data/great_apes_final.h5t"
+CXG_FILE = "/data/home/gaetandw/express/data/cellxgene.h5t"
 
 f = h5py.File(INPUT_FILE)
 
@@ -39,7 +39,7 @@ for g_id in gene_ids:
         indices_map.append(np.nan)
 indices_map = np.array(indices_map)
 
-new_matrix = np.zeros((matrix.shape[0], 19331), dtype="int16")
+new_matrix = np.zeros((matrix.shape[0], 19331), dtype="int32")
 for ix, l in tqdm(enumerate(indices_map)):
     if ~np.isnan(l):
         new_matrix[:, l.astype(int)] = matrix[:, ix]
@@ -91,7 +91,16 @@ f.register(
 f.register(
     cell_type_cats.astype(bytes),
     axis="unstructured",
-    name="2_cell_type_categories",
+    name="3_cell_type_categories",
+    dtype_save="bytes",
+    dtype_load="str"
+)
+
+split = np.full((len(obs)), "test")
+f.register(
+    split,
+    axis=0,
+    name="split",
     dtype_save="bytes",
     dtype_load="str"
 )
