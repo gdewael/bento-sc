@@ -1,4 +1,5 @@
 from express.data import ExpressDataModule
+from express.utils.config import Config
 from express.models import CLSTaskTransformer
 from express.baselines import CLSTaskBaseline
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
@@ -11,16 +12,18 @@ baseline = str(sys.argv[2])
 logs_path = str(sys.argv[3])
 no = str(sys.argv[4])
 
+config = Config(config_path)
+
 dm = ExpressDataModule(
-    config_path
+    config
 )
 dm.setup(None)
 
 if baseline == "baseline":
-    model = CLSTaskBaseline(config_path)
+    model = CLSTaskBaseline(config)
 else:
     model = CLSTaskTransformer(
-        config_path
+        config
     )
 
 val_ckpt = ModelCheckpoint(monitor="val_loss", mode="min")

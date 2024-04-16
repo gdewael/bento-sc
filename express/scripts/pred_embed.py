@@ -1,3 +1,16 @@
+import sys
+config_path = str(sys.argv[1])
+baseline = str(sys.argv[2])
+n_threads = str(sys.argv[3])
+embeddings_save_path = str(sys.argv[4])
+
+import os
+os.environ["NUMBA_NUM_THREADS"] = n_threads
+os.environ["OMP_NUM_THREADS"] = n_threads
+os.environ["OPENBLAS_NUM_THREADS"] = n_threads
+os.environ["MKL_NUM_THREADS"] = n_threads
+os.environ["VECLIB_MAXIMUM_THREADS"] = n_threads
+os.environ["NUMEXPR_NUM_THREADS"] = n_threads
 
 import torch
 import numpy as np
@@ -5,20 +18,14 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_samples
 from sklearn.preprocessing import StandardScaler
 from express.data import ExpressDataModule
-import sys
+from express.utils.config import Config
+
 from tqdm import tqdm
 
-config_path = str(sys.argv[1])
-baseline = str(sys.argv[2])
-n_threads = str(sys.argv[3])
-embeddings_save_path = str(sys.argv[4])
-
-import os
-
-os.environ["NUMBA_NUM_THREADS"] = n_threads
+config = Config(config_path)
 
 dm = ExpressDataModule(
-    config_path
+    config
 )
 dm.setup(None)
 
@@ -31,9 +38,9 @@ for batch in tqdm(dm.test_dataloader()):
 embeds = torch.cat(embeds).numpy()
 obs = torch.cat(obs).numpy()
 
-ss = StandardScaler()
+#ss = StandardScaler()
 pca = PCA(n_components=64)
-embeds = ss.fit_transform(embeds)
+#embeds = ss.fit_transform(embeds)
 embeds = pca.fit_transform(embeds)
 
 def ASWct(embeddings, celltypes):

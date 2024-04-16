@@ -9,13 +9,11 @@ from torch.distributions.poisson import Poisson
 from torch.distributions.normal import Normal
 from einops import rearrange
 from h5torch.dataset import sample_csr
-from express.utils.config import Config
-
 
 class ExpressDataModule(LightningDataModule):
-    def __init__(self, config_path):
+    def __init__(self, config):
         super().__init__()
-        self.config = Config(config_path)
+        self.config = config
 
     def setup(self, stage):
 

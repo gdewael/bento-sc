@@ -5,7 +5,6 @@ import lightning.pytorch as pl
 from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
 from express import loss
-from express.utils.config import Config
 from scipy.stats import spearmanr
 from torchmetrics.classification import MulticlassAccuracy
 import numpy as np
@@ -34,12 +33,12 @@ class EmbeddingPseudoQuantizer(nn.Module):
 class ExpressTransformer(pl.LightningModule):
     def __init__(
         self,
-        config_path
+        config
     ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.config = Config(config_path)
+        self.config = config
 
         if self.config.discrete_input:
             self.embedder = DiscreteEmbedding(self.config.n_discrete_tokens, self.config.dim, cls=True)
@@ -56,7 +55,12 @@ class ExpressTransformer(pl.LightningModule):
             dim=self.config.dim,
             nh=8,
             attentiontype="vanilla",
-            attention_args={"dropout": self.config.dropout},
+            attention_args={
+                "dropout": self.config.dropout,
+                "enable_math" : False,
+                "enable_flash" : True,
+                "enable_mem_efficient" : True
+                },
             plugintype="learned",
             plugin_args={"dim": self.config.dim, "max_seq_len": self.config.n_genes},
             only_apply_plugin_at_first=True,
@@ -71,7 +75,6 @@ class ExpressTransformer(pl.LightningModule):
             "PoissonNLL": loss.PoissonNLL,
             "NegativeBinomialNLL": loss.NegativeBinomialNLL,
             "ZeroInflatedNegativeBinomialNLL": loss.ZeroInflatedNegativeBinomialNLL,
-
         }
 
         type_ = self.config.loss.pop("type")
@@ -162,9 +165,9 @@ class ExpressTransformer(pl.LightningModule):
 class PerturbTransformer(ExpressTransformer):
     def __init__(
         self,
-        config_path
+        config
     ):
-        super().__init__(config_path)
+        super().__init__(config)
         assert self.config.nce_loss == False
         assert self.config.celltype_clf_loss == False
         assert self.config.train_on_all == True
@@ -247,9 +250,9 @@ class PerturbTransformer(ExpressTransformer):
 class CLSTaskTransformer(ExpressTransformer):
     def __init__(
         self,
-        config_path
+        config
     ):
-        super().__init__(config_path)
+        super().__init__(config)
         assert self.config.nce_loss == False
         
         if self.config.celltype_clf_loss:

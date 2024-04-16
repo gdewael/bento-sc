@@ -1,6 +1,7 @@
 from express.data import ExpressDataModule
 from express.models import PerturbTransformer
 from express.baselines import PerturbBaseline
+from express.utils.config import Config
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch import Trainer
@@ -11,16 +12,18 @@ baseline = str(sys.argv[2])
 logs_path = str(sys.argv[3])
 no = str(sys.argv[4])
 
+config = Config(config_path)
+
 dm = ExpressDataModule(
-    config_path
+    config
 )
 dm.setup(None)
 
 if baseline == "baseline":
-    model = PerturbBaseline(config_path)
+    model = PerturbBaseline(config)
 else:
     model = PerturbTransformer(
-        config_path
+        config
     )
 
 val_ckpt = ModelCheckpoint(monitor="val_loss", mode="min")

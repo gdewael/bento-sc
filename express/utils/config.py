@@ -10,8 +10,11 @@ class Config(dict):
             super().__init__(**kwargs)
     
     def __getattr__(self, name):
-        value = self[name]
-        return value
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
     
     def write(self, path):
         with open(path, 'w') as outfile:
@@ -20,4 +23,3 @@ class Config(dict):
     def change_keys(self, **kwargs):
         for k, v in kwargs.items():
             self[k] = v
-

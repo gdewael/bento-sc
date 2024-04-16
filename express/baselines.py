@@ -28,12 +28,12 @@ class View(nn.Module):
 class PerturbBaseline(pl.LightningModule):
     def __init__(
         self,
-        config_path,
+        config,
     ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.config = Config(config_path)
+        self.config = config
         dim_per_gene = self.config.baseline_perturb_dim_per_gene
         bottleneck_dim = self.config.baseline_perturb_bottleneck_dim
 
@@ -130,12 +130,12 @@ class PerturbBaseline(pl.LightningModule):
 class CLSTaskBaseline(pl.LightningModule):
     def __init__(
         self,
-        config_path,
+        config,
     ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.config = Config(config_path)
+        self.config = config
         layers = self.config.baseline_cls_task_layers
 
         if layers == []:
