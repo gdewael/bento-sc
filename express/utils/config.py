@@ -23,3 +23,14 @@ class Config(dict):
     def change_keys(self, **kwargs):
         for k, v in kwargs.items():
             self[k] = v
+
+    def print_used_keys(self, used_keys):
+        unused_keys = set(self) - used_keys
+        print("Config used:")
+        for i in used_keys:
+            name = (i[:18] + '..') if len(i) > 20 else i
+            print(name[:20] + " "*(20-len(i)), "\t", self[i])
+        print("Config unused:")
+        for i in unused_keys:
+            name = (i[:18] + '..') if len(i) > 20 else i
+            print(name[:20] + " "*(20-len(i)), "\t", self[i])

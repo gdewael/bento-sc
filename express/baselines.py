@@ -126,6 +126,14 @@ class PerturbBaseline(pl.LightningModule):
 
         return optimizer
 
+    @property
+    def config_used(self):
+        return {"baseline_perturb_dim_per_gene", "baseline_perturb_bottleneck_dim", "lr"}
+    
+    @property
+    def config_unused(self):
+        return set(self.config) - self.config_used
+
 
 class CLSTaskBaseline(pl.LightningModule):
     def __init__(
@@ -230,3 +238,11 @@ class CLSTaskBaseline(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
 
         return optimizer
+    
+    @property
+    def config_used(self):
+        return {"baseline_cls_task_layers", "celltype_clf_loss", "modality_prediction_loss", "cls_finetune_dim", "lr"}
+    
+    @property
+    def config_unused(self):
+        return set(self.config) - self.config_used

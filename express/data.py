@@ -9,6 +9,7 @@ from torch.distributions.poisson import Poisson
 from torch.distributions.normal import Normal
 from einops import rearrange
 from h5torch.dataset import sample_csr
+from copy import deepcopy
 
 class ExpressDataModule(LightningDataModule):
     def __init__(self, config):
@@ -39,8 +40,9 @@ class ExpressDataModule(LightningDataModule):
         if "input_processing" in self.config:
             processor = []
             for prepr in self.config["input_processing"]:
-                type_ = prepr.pop("type")
-                processor.append(preprocessing_mapper[type_](**prepr))
+                prepr_type = prepr["type"]
+                prepr_kwargs = {k: v for k, v in prepr.items() if k != "type"}
+                processor.append(preprocessing_mapper[prepr_type](**prepr_kwargs))
         else:
             processor = []
         processor = SequentialPreprocessor(*processor)
@@ -126,6 +128,15 @@ class ExpressDataModule(LightningDataModule):
             pin_memory=True,
             collate_fn=batch_collater,
         )
+    
+    @property
+    def config_used(self):
+        return {"input_processing", "perturb_mode", "data_path", "return_zeros", "in_memory", "n_workers", "batch_size"}
+    
+    @property
+    def config_unused(self):
+        return set(self.config) - self.config_used
+
 
 
 class CellSampleProcessor:

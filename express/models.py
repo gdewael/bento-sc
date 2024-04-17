@@ -78,8 +78,9 @@ class ExpressTransformer(pl.LightningModule):
             "ZeroInflatedNegativeBinomialNLL": loss.ZeroInflatedNegativeBinomialNLL,
         }
 
-        type_ = self.config.loss.pop("type")
-        self.loss = loss_mapper[type_](self.config.dim, **self.config.loss)
+        loss_type = self.config.loss["type"]
+        loss_kwargs = {k: v for k, v in self.config.loss.items() if k != "type"}
+        self.loss = loss_mapper[loss_type](self.config.dim, **loss_kwargs)
 
         if self.config.nce_loss:
             self.nce_loss = loss.NCELoss(self.config.dim, self.config.nce_dim, temperature=self.config.nce_temp)
@@ -161,6 +162,30 @@ class ExpressTransformer(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
 
         return optimizer
+    
+    @property
+    def config_used(self):
+        return {
+            "n_discrete_tokens",
+            "dim",
+            "pseudoquant_input",
+            "gate_input",
+            "depth",
+            "dropout",
+            "n_genes",
+            "loss",
+            "nce_loss",
+            "nce_dim",
+            "nce_temp",
+            "celltype_clf_loss",
+            "lr",
+            "train_on_all",
+        }
+    
+    @property
+    def config_unused(self):
+        return set(self.config) - self.config_used
+
 
 
 class PerturbTransformer(ExpressTransformer):
@@ -247,6 +272,10 @@ class PerturbTransformer(ExpressTransformer):
         y = self(batch)
         y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
         return (y, batch["gene_counts_true"], batch["gene_counts_copy"], batch["gene_index"])
+    
+    @property
+    def config_used(self):
+        return {"n_discrete_tokens", "dim", "pseudoquant_input", "gate_input", "depth", "dropout", "n_genes", "loss", "lr"}
 
 class CLSTaskTransformer(ExpressTransformer):
     def __init__(
@@ -330,3 +359,19 @@ class CLSTaskTransformer(ExpressTransformer):
             self.log("val_macro_spearman", np.mean(spearmans), sync_dist=True)
 
         self.validation_step_outputs.clear()
+
+    @property
+    def config_used(self):
+        return {
+            "n_discrete_tokens",
+            "dim",
+            "pseudoquant_input",
+            "gate_input",
+            "depth",
+            "dropout",
+            "n_genes",
+            "lr",
+            "celltype_clf_loss",
+            "modality_prediction_loss",
+            "cls_finetune_dim"
+        }
