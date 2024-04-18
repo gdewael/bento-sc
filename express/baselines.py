@@ -58,7 +58,7 @@ class PerturbBaseline(pl.LightningModule):
 
         )
 
-        self.lr = self.config.lr
+        self.lr = float(self.config.lr)
         self.validation_step_outputs = []
 
     def forward(self, batch):
@@ -168,7 +168,7 @@ class CLSTaskBaseline(pl.LightningModule):
         else:
             raise ValueError("At least one of celltype clf loss or modality predict loss should be true")
 
-        self.lr = self.config.lr
+        self.lr = float(self.config.lr)
         self.validation_step_outputs = []
 
         if self.config.celltype_clf_loss:

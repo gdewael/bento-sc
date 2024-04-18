@@ -40,7 +40,7 @@ else:
 trainer = Trainer(
     accelerator="gpu",
     devices=config.devices,
-    strategy="ddp",
+    strategy="auto",
     plugins=[LightningEnvironment()],
     gradient_clip_val=1,
     max_steps=max_steps,

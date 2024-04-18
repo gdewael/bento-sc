@@ -88,7 +88,7 @@ class ExpressTransformer(pl.LightningModule):
         if self.config.celltype_clf_loss:
             self.ct_clf_loss = loss.CellTypeClfLoss(self.config.dim, 164)
 
-        self.lr = self.config.lr
+        self.lr = float(self.config.lr)
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
