@@ -3,6 +3,7 @@ from express.models import ExpressTransformer
 from express.utils.config import Config
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import sys
 import os
@@ -39,7 +40,8 @@ else:
 trainer = Trainer(
     accelerator="gpu",
     devices=config.devices,
-    strategy="auto",
+    strategy="ddp",
+    plugins=[LightningEnvironment()],
     gradient_clip_val=1,
     max_steps=max_steps,
     val_check_interval=5000,
