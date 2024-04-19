@@ -10,6 +10,9 @@ from torch.distributions.normal import Normal
 from einops import rearrange
 from h5torch.dataset import sample_csr
 from copy import deepcopy
+from torch.utils.data import *
+import math
+
 
 class ExpressDataModule(LightningDataModule):
     def __init__(self, config):
@@ -70,15 +73,7 @@ class ExpressDataModule(LightningDataModule):
             sample_processor=processing_class(
                 processor, return_zeros=self.config["return_zeros"]
             ),
-            subset=("0/split", "val"),
-        )
-
-        self.val_sub = h5torch.Dataset(
-            f,
-            sample_processor=processing_class(
-                processor, return_zeros=self.config["return_zeros"]
-            ),
-            subset=("0/split", "val_sub"),
+            subset=("0/split", ("val_sub" if self.config.val_sub else "val")),
         )
 
         self.test = h5torch.Dataset(
@@ -90,48 +85,80 @@ class ExpressDataModule(LightningDataModule):
         )
 
     def train_dataloader(self):
+        batch_sampler = self.configure_batch_sampler(self.train, n_partitions = 100)
+        if batch_sampler is not None:
+            extra_kwargs = {}
+        else:
+            extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": True}
+        
         return torch.utils.data.DataLoader(
             self.train,
-            num_workers=self.config["n_workers"],
-            batch_size=self.config["batch_size"],
-            shuffle=True,
+            num_workers=self.config.n_workers,
             pin_memory=True,
-            collate_fn=batch_collater,
+            collate_fn=BatchCollater(self.config.allow_padding),
+            batch_sampler = batch_sampler,
+            **extra_kwargs
         )
 
     def val_dataloader(self):
+        batch_sampler = self.configure_batch_sampler(self.val, n_partitions = 1)
+        if batch_sampler is not None:
+            extra_kwargs = {}
+        else:
+            extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": False}
+
         return torch.utils.data.DataLoader(
             self.val,
-            num_workers=self.config["n_workers"],
-            batch_size=self.config["batch_size"],
-            shuffle=False,
+            num_workers=self.config.n_workers,
             pin_memory=True,
-            collate_fn=batch_collater,
-        )
-    
-    def val_sub_dataloader(self):
-        return torch.utils.data.DataLoader(
-            self.val_sub,
-            num_workers=self.config["n_workers"],
-            batch_size=self.config["batch_size"],
-            shuffle=False,
-            pin_memory=True,
-            collate_fn=batch_collater,
+            collate_fn=BatchCollater(self.config.allow_padding),
+            batch_sampler = batch_sampler,
+            **extra_kwargs
         )
 
     def test_dataloader(self):
+        batch_sampler = self.configure_batch_sampler(self.test, n_partitions = 1)
+        if batch_sampler is not None:
+            extra_kwargs = {}
+        else:
+            extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": False}
+
         return torch.utils.data.DataLoader(
             self.test,
-            num_workers=self.config["n_workers"],
-            batch_size=self.config["batch_size"],
-            shuffle=False,
+            num_workers=self.config.n_workers,
             pin_memory=True,
-            collate_fn=batch_collater,
+            collate_fn=BatchCollater(True),
+            batch_sampler = batch_sampler,
+            **extra_kwargs
         )
+    
+    def configure_batch_sampler(self, dataset, n_partitions=100):
+        if not self.config.return_zeros:
+            if (
+                    (isinstance(self.config.devices, list) and len(self.config.devices) > 1) or 
+                    (isinstance(self.config.devices, int) and self.config.devices > 1)
+                ):
+                batch_sampler = DistributedBucketSampler(dataset, self.config.batch_size, n_partitions=n_partitions)
+            else:
+                batch_sampler = BucketBatchSampler(dataset, self.config.batch_size, n_partitions=n_partitions)
+
+        else:
+            batch_sampler = None
+        return batch_sampler
     
     @property
     def config_used(self):
-        return {"input_processing", "perturb_mode", "data_path", "return_zeros", "in_memory", "n_workers", "batch_size"}
+        return {
+            "input_processing",
+            "perturb_mode",
+            "data_path",
+            "return_zeros",
+            "in_memory",
+            "n_workers",
+            "batch_size"
+            "devices",
+            "allow_padding",
+        }
     
     @property
     def config_unused(self):
@@ -492,55 +519,141 @@ class SequentialPreprocessor:
             sample = step(sample)
         return sample
 
-
-def batch_collater(batch):
-    batch_collated = {}
-    
-    batch_collated["0/split"] = [b["0/split"] for b in batch]
-
-    if "0/obs" in batch[0]:
-        batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
-
-    if "0/perturbed_gene" in batch[0]:
-        batch_collated["0/perturbed_gene"] = torch.tensor(np.array([b["0/perturbed_gene"] for b in batch])).long()
-
-    if "0/ADT" in batch[0]:
-        batch_collated["0/targets"] = torch.tensor(np.array([b["0/ADT"] for b in batch]))
-    elif ("0/obs" in batch[0]) and (batch[0]["0/obs"].shape[0] == 9):
-        # essentially hardcoded to detect the cellxgene pre-training set this way
-        # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
-        batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
-
-    counts_keys = ["gene_index", "gene_counts", "gene_counts_true"]
-    append_value = [0, -1, -1]
-    if "gene_counts_copy" in batch[0]:
-        counts_keys.append("gene_counts_copy")
-        append_value.append(-1)
-
-    for name, padval in zip(
-        counts_keys, append_value
-    ):
-
-        if batch[0][name].ndim == 1:
-            if len({b[name].shape for b in batch}) == 1:
-                batch_collated[name] = torch.stack([b[name] for b in batch])
-            else:
-                batch_collated[name] = pad_sequence(
-                    [b[name] for b in batch], batch_first=True, padding_value=padval
-                )
-        else:
-            if len({b[name].shape for b in batch}) == 1:
-                batch_collated[name] = torch.cat([b[name] for b in batch], 0)
-            batch_collated[name] = rearrange(
-                pad_sequence(
-                    [b[name].T for b in batch], batch_first=True, padding_value=padval
-                ),
-                "b l k -> (b k) l",
-            )
-
-    if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
-        batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
-        if "0/obs" in batch_collated:
-            batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
+class BatchCollater():
+    def __init__(self, allow_padding = False):
+        self.allow_padding = allow_padding
         
-    return batch_collated
+    def __call__(self, batch):
+        batch_collated = {}
+        
+        batch_collated["0/split"] = [b["0/split"] for b in batch]
+
+        if "0/obs" in batch[0]:
+            batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
+
+        if "0/perturbed_gene" in batch[0]:
+            batch_collated["0/perturbed_gene"] = torch.tensor(np.array([b["0/perturbed_gene"] for b in batch])).long()
+
+        if "0/ADT" in batch[0]:
+            batch_collated["0/targets"] = torch.tensor(np.array([b["0/ADT"] for b in batch]))
+        elif ("0/obs" in batch[0]) and (batch[0]["0/obs"].shape[0] == 9):
+            # essentially hardcoded to detect the cellxgene pre-training set this way
+            # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
+            batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
+
+        counts_keys = ["gene_index", "gene_counts", "gene_counts_true"]
+        append_value = [0, -1, -1]
+        if "gene_counts_copy" in batch[0]:
+            counts_keys.append("gene_counts_copy")
+            append_value.append(-1)
+
+        for name, padval in zip(
+            counts_keys, append_value
+        ):
+            samples_key = [b[name] for b in batch]
+            if not self.allow_padding:
+                samples_key = self.cut_to_uniform_size(samples_key)
+
+            if batch[0][name].ndim == 1:
+                if len({b[name].shape for b in batch}) == 1:
+                    batch_collated[name] = torch.stack(samples_key)
+                else:
+                    batch_collated[name] = pad_sequence(
+                        samples_key, batch_first=True, padding_value=padval
+                    )
+            else:
+                if len({b[name].shape for b in batch}) == 1:
+                    batch_collated[name] = torch.cat(samples_key, 0)
+                else:
+                    batch_collated[name] = rearrange(
+                        pad_sequence(
+                            [b.T for b in samples_key], batch_first=True, padding_value=padval
+                        ),
+                        "b l k -> (b k) l",
+                    )
+
+        if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
+            batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
+            if "0/obs" in batch_collated:
+                batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
+            
+        return batch_collated
+    
+    @staticmethod
+    def cut_to_uniform_size(list_of_objects):
+        min_len = min([b.shape[-1] for b in list_of_objects])
+        return [b[..., :min_len] for b in list_of_objects]
+        
+
+
+class BucketBatchSampler(BatchSampler):
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        n_partitions = 100,
+        indices = None,
+    ):
+        super().__init__(dataset, batch_size, False)
+
+        self.len_dataset = (len(dataset) if indices is None else len(indices))
+
+        self.seqlens = torch.tensor(np.diff(dataset.f["central/indptr"][:])[dataset.indices])
+        if indices is not None:
+            self.seqlens = self.seqlens[indices]
+            indices = np.array(indices)
+        else:
+            indices = np.arange(self.len_dataset)
+
+        self.bucket_sampler = BatchSampler(
+            RandomSampler(indices),
+            math.ceil(self.len_dataset / n_partitions),
+            False
+        )
+        self.n_partitions = n_partitions
+        self.indices = indices
+
+    def __iter__(self):
+        for bucket in self.bucket_sampler:
+            sorted_sampler = torch.argsort(self.seqlens[bucket])
+            for batch in SubsetRandomSampler(list(BatchSampler(sorted_sampler, self.batch_size, self.drop_last))):
+                yield [self.indices[bucket[i]] for i in batch]
+
+    def __len__(self):
+        t = [math.ceil(self.len_dataset / self.n_partitions)] * self.n_partitions
+        t[-1] -= (self.len_dataset // self.n_partitions) % self.n_partitions
+        len_ = sum([math.ceil(tt / self.batch_size) for tt in t])
+        return len_
+
+class DistributedBucketSampler(DistributedSampler):
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        n_partitions = 100,
+        num_replicas=None,
+        rank=None,
+        shuffle=True,
+        seed=0,
+    ):
+        super().__init__(
+            dataset,
+            num_replicas=num_replicas,
+            rank=rank,
+            shuffle=shuffle,
+            seed=seed,
+            drop_last=False
+        )
+
+        self.batch_size = batch_size
+        self.n_partitions = n_partitions
+    
+    def __iter__(self):
+        indices = list(super().__iter__())
+        batch_sampler = BucketBatchSampler(
+            self.dataset,
+            batch_size=self.batch_size,
+            n_partitions=self.n_partitions,
+            indices = indices
+            )
+        return iter(batch_sampler)
