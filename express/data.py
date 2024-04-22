@@ -165,6 +165,152 @@ class ExpressDataModule(LightningDataModule):
         return set(self.config) - self.config_used
 
 
+class BatchCollater():
+    def __init__(self, allow_padding = False):
+        self.allow_padding = allow_padding
+        
+    def __call__(self, batch):
+        batch_collated = {}
+        
+        batch_collated["0/split"] = [b["0/split"] for b in batch]
+
+        if "0/obs" in batch[0]:
+            batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
+
+        if "0/perturbed_gene" in batch[0]:
+            batch_collated["0/perturbed_gene"] = torch.tensor(np.array([b["0/perturbed_gene"] for b in batch])).long()
+
+        if "0/ADT" in batch[0]:
+            batch_collated["0/targets"] = torch.tensor(np.array([b["0/ADT"] for b in batch]))
+        elif ("0/obs" in batch[0]) and (batch[0]["0/obs"].shape[0] == 9):
+            # essentially hardcoded to detect the cellxgene pre-training set this way
+            # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
+            batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
+
+        counts_keys = ["gene_index", "gene_counts", "gene_counts_true"]
+        append_value = [0, -1, -1]
+        if "gene_counts_copy" in batch[0]:
+            counts_keys.append("gene_counts_copy")
+            append_value.append(-1)
+
+        for name, padval in zip(
+            counts_keys, append_value
+        ):
+            samples_key = [b[name] for b in batch]
+            if not self.allow_padding:
+                samples_key = self.cut_to_uniform_size(samples_key)
+
+            if batch[0][name].ndim == 1:
+                if len({b[name].shape for b in batch}) == 1:
+                    batch_collated[name] = torch.stack(samples_key)
+                else:
+                    batch_collated[name] = pad_sequence(
+                        samples_key, batch_first=True, padding_value=padval
+                    )
+            else:
+                if len({b[name].shape for b in batch}) == 1:
+                    batch_collated[name] = torch.cat(samples_key, 0)
+                else:
+                    batch_collated[name] = rearrange(
+                        pad_sequence(
+                            [b.T for b in samples_key], batch_first=True, padding_value=padval
+                        ),
+                        "b l k -> (b k) l",
+                    )
+
+        if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
+            batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
+            if "0/obs" in batch_collated:
+                batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
+            
+        return batch_collated
+    
+    @staticmethod
+    def cut_to_uniform_size(list_of_objects):
+        min_len = min([b.shape[-1] for b in list_of_objects])
+        return [b[..., :min_len] for b in list_of_objects]
+        
+
+
+class BucketBatchSampler(BatchSampler):
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        n_partitions = 100,
+        indices = None,
+    ):
+        super().__init__(dataset, batch_size, False)
+
+        self.len_dataset = (len(dataset) if indices is None else len(indices))
+
+        self.seqlens = torch.tensor(np.diff(dataset.f["central/indptr"][:])[dataset.indices])
+        if indices is not None:
+            self.seqlens = self.seqlens[indices]
+            indices = np.array(indices)
+        else:
+            indices = np.arange(self.len_dataset)
+
+        self.bucket_sampler = BatchSampler(
+            RandomSampler(indices),
+            math.ceil(self.len_dataset / n_partitions),
+            False
+        )
+        self.n_partitions = n_partitions
+        self.indices = indices
+
+    def __iter__(self):
+        for bucket in self.bucket_sampler:
+            sorted_sampler = torch.argsort(self.seqlens[bucket])
+            batch_sampler = list(BatchSampler(sorted_sampler, self.batch_size, self.drop_last))
+            batch_sampler.reverse()
+            for batch in batch_sampler: #SubsetRandomSampler(list())
+                yield [self.indices[bucket[i]] for i in batch]
+
+    def __len__(self):
+        t = [math.ceil(self.len_dataset / self.n_partitions)] * self.n_partitions
+        t[-1] -= (self.len_dataset // self.n_partitions) % self.n_partitions
+        len_ = sum([math.ceil(tt / self.batch_size) for tt in t])
+        return len_
+
+class DistributedBucketSampler(DistributedSampler):
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        n_partitions = 100,
+        num_replicas=None,
+        rank=None,
+        shuffle=True,
+        seed=0,
+    ):
+        super().__init__(
+            dataset,
+            num_replicas=num_replicas,
+            rank=rank,
+            shuffle=shuffle,
+            seed=seed,
+            drop_last=False
+        )
+
+        self.batch_size = batch_size
+        self.n_partitions = n_partitions
+    
+    def __iter__(self):
+        indices = list(super().__iter__())
+        batch_sampler = BucketBatchSampler(
+            self.dataset,
+            batch_size=self.batch_size,
+            n_partitions=self.n_partitions,
+            indices = indices
+            )
+        return iter(batch_sampler)
+
+    def __len__(self):
+        t = [math.ceil(self.num_samples / self.n_partitions)] * self.n_partitions
+        t[-1] -= (self.num_samples // self.n_partitions) % self.n_partitions
+        len_ = sum([math.ceil(tt / self.batch_size) for tt in t])
+        return len_
 
 class CellSampleProcessor:
     def __init__(self, processor, return_zeros=False, n_genes=19331):
@@ -518,142 +664,3 @@ class SequentialPreprocessor:
         for step in self.preprocessors:
             sample = step(sample)
         return sample
-
-class BatchCollater():
-    def __init__(self, allow_padding = False):
-        self.allow_padding = allow_padding
-        
-    def __call__(self, batch):
-        batch_collated = {}
-        
-        batch_collated["0/split"] = [b["0/split"] for b in batch]
-
-        if "0/obs" in batch[0]:
-            batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
-
-        if "0/perturbed_gene" in batch[0]:
-            batch_collated["0/perturbed_gene"] = torch.tensor(np.array([b["0/perturbed_gene"] for b in batch])).long()
-
-        if "0/ADT" in batch[0]:
-            batch_collated["0/targets"] = torch.tensor(np.array([b["0/ADT"] for b in batch]))
-        elif ("0/obs" in batch[0]) and (batch[0]["0/obs"].shape[0] == 9):
-            # essentially hardcoded to detect the cellxgene pre-training set this way
-            # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
-            batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
-
-        counts_keys = ["gene_index", "gene_counts", "gene_counts_true"]
-        append_value = [0, -1, -1]
-        if "gene_counts_copy" in batch[0]:
-            counts_keys.append("gene_counts_copy")
-            append_value.append(-1)
-
-        for name, padval in zip(
-            counts_keys, append_value
-        ):
-            samples_key = [b[name] for b in batch]
-            if not self.allow_padding:
-                samples_key = self.cut_to_uniform_size(samples_key)
-
-            if batch[0][name].ndim == 1:
-                if len({b[name].shape for b in batch}) == 1:
-                    batch_collated[name] = torch.stack(samples_key)
-                else:
-                    batch_collated[name] = pad_sequence(
-                        samples_key, batch_first=True, padding_value=padval
-                    )
-            else:
-                if len({b[name].shape for b in batch}) == 1:
-                    batch_collated[name] = torch.cat(samples_key, 0)
-                else:
-                    batch_collated[name] = rearrange(
-                        pad_sequence(
-                            [b.T for b in samples_key], batch_first=True, padding_value=padval
-                        ),
-                        "b l k -> (b k) l",
-                    )
-
-        if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
-            batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
-            if "0/obs" in batch_collated:
-                batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
-            
-        return batch_collated
-    
-    @staticmethod
-    def cut_to_uniform_size(list_of_objects):
-        min_len = min([b.shape[-1] for b in list_of_objects])
-        return [b[..., :min_len] for b in list_of_objects]
-        
-
-
-class BucketBatchSampler(BatchSampler):
-    def __init__(
-        self,
-        dataset,
-        batch_size,
-        n_partitions = 100,
-        indices = None,
-    ):
-        super().__init__(dataset, batch_size, False)
-
-        self.len_dataset = (len(dataset) if indices is None else len(indices))
-
-        self.seqlens = torch.tensor(np.diff(dataset.f["central/indptr"][:])[dataset.indices])
-        if indices is not None:
-            self.seqlens = self.seqlens[indices]
-            indices = np.array(indices)
-        else:
-            indices = np.arange(self.len_dataset)
-
-        self.bucket_sampler = BatchSampler(
-            RandomSampler(indices),
-            math.ceil(self.len_dataset / n_partitions),
-            False
-        )
-        self.n_partitions = n_partitions
-        self.indices = indices
-
-    def __iter__(self):
-        for bucket in self.bucket_sampler:
-            sorted_sampler = torch.argsort(self.seqlens[bucket])
-            for batch in SubsetRandomSampler(list(BatchSampler(sorted_sampler, self.batch_size, self.drop_last))):
-                yield [self.indices[bucket[i]] for i in batch]
-
-    def __len__(self):
-        t = [math.ceil(self.len_dataset / self.n_partitions)] * self.n_partitions
-        t[-1] -= (self.len_dataset // self.n_partitions) % self.n_partitions
-        len_ = sum([math.ceil(tt / self.batch_size) for tt in t])
-        return len_
-
-class DistributedBucketSampler(DistributedSampler):
-    def __init__(
-        self,
-        dataset,
-        batch_size,
-        n_partitions = 100,
-        num_replicas=None,
-        rank=None,
-        shuffle=True,
-        seed=0,
-    ):
-        super().__init__(
-            dataset,
-            num_replicas=num_replicas,
-            rank=rank,
-            shuffle=shuffle,
-            seed=seed,
-            drop_last=False
-        )
-
-        self.batch_size = batch_size
-        self.n_partitions = n_partitions
-    
-    def __iter__(self):
-        indices = list(super().__iter__())
-        batch_sampler = BucketBatchSampler(
-            self.dataset,
-            batch_size=self.batch_size,
-            n_partitions=self.n_partitions,
-            indices = indices
-            )
-        return iter(batch_sampler)

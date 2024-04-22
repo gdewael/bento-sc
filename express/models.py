@@ -60,7 +60,7 @@ class ExpressTransformer(pl.LightningModule):
                 "dropout": self.config.dropout,
                 "enable_math" : False,
                 "enable_flash" : True,
-                "enable_mem_efficient" : True
+                "enable_mem_efficient" : True,
                 },
             plugintype="learned",
             plugin_args={"dim": self.config.dim, "max_seq_len": self.config.n_genes},

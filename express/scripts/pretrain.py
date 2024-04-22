@@ -49,13 +49,7 @@ trainer = Trainer(
     callbacks=callbacks,
     logger=logger,
     precision="bf16-true",
-    use_distributed_sampler=False
+    use_distributed_sampler=(True if config.return_zeros else False),
 )
 
 trainer.fit(model, dm)
-
-#res = trainer.validate(model, dm.val_sub_dataloader())[0]
-
-#config.write(os.path.join(trainer.logger.log_dir, "config.yaml"))
-#with open(os.path.join(trainer.logger.log_dir, "res.txt"), "a") as f:
-#    f.write("val_loss\t%.5f\n" % (res["val_loss"]))
