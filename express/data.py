@@ -94,7 +94,7 @@ class ExpressDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.train,
             num_workers=self.config.n_workers,
-            pin_memory=False,
+            pin_memory=True,
             collate_fn=BatchCollater(self.config.allow_padding),
             batch_sampler = batch_sampler,
             **extra_kwargs
@@ -110,7 +110,7 @@ class ExpressDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.val,
             num_workers=self.config.n_workers,
-            pin_memory=False,
+            pin_memory=True,
             collate_fn=BatchCollater(self.config.allow_padding),
             batch_sampler = batch_sampler,
             **extra_kwargs
@@ -126,7 +126,7 @@ class ExpressDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.test,
             num_workers=self.config.n_workers,
-            pin_memory=False,
+            pin_memory=True,
             collate_fn=BatchCollater(True),
             batch_sampler = batch_sampler,
             **extra_kwargs
@@ -262,11 +262,12 @@ class BucketBatchSampler(BatchSampler):
         self.n_partitions = n_partitions
         self.indices = indices
 
-        self.asort = torch.argsort(self.seqlens)
-
     def __iter__(self):
-        for batch in BatchSampler(self.asort, self.batch_size, self.drop_last): #SubsetRandomSampler(list())
-            yield batch
+        for bucket in self.bucket_sampler:
+            bucket_indices = self.indices[bucket]
+            bucket_asort_seqlens = torch.argsort(self.seqlens[bucket], descending=True)
+            for batch in BatchSampler(bucket_asort_seqlens, self.batch_size, self.drop_last): #SubsetRandomSampler(list())
+                yield [bucket_indices[i] for i in batch]
 
     def __len__(self):
         t = [math.ceil(self.len_dataset / self.n_partitions)] * self.n_partitions
