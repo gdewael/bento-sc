@@ -94,7 +94,7 @@ class ExpressDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.train,
             num_workers=self.config.n_workers,
-            pin_memory=True,
+            pin_memory=False,
             collate_fn=BatchCollater(self.config.allow_padding),
             batch_sampler = batch_sampler,
             **extra_kwargs
@@ -110,7 +110,7 @@ class ExpressDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.val,
             num_workers=self.config.n_workers,
-            pin_memory=True,
+            pin_memory=False,
             collate_fn=BatchCollater(self.config.allow_padding),
             batch_sampler = batch_sampler,
             **extra_kwargs
@@ -126,7 +126,7 @@ class ExpressDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.test,
             num_workers=self.config.n_workers,
-            pin_memory=True,
+            pin_memory=False,
             collate_fn=BatchCollater(True),
             batch_sampler = batch_sampler,
             **extra_kwargs
