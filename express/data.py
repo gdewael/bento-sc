@@ -265,8 +265,9 @@ class BucketBatchSampler(BatchSampler):
     def __iter__(self):
         for bucket in self.bucket_sampler:
             sorted_sampler = torch.argsort(self.seqlens[bucket])
-            batch_sampler = list(BatchSampler(sorted_sampler, self.batch_size, self.drop_last))
-            batch_sampler.reverse()
+            #batch_sampler = list(BatchSampler(sorted_sampler, self.batch_size, self.drop_last))
+            #batch_sampler.reverse()
+            batch_sampler = BatchSampler(sorted_sampler, self.batch_size, self.drop_last)
             for batch in batch_sampler: #SubsetRandomSampler(list())
                 yield [self.indices[bucket[i]] for i in batch]
 
