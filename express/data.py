@@ -263,11 +263,16 @@ class BucketBatchSampler(BatchSampler):
         self.indices = indices
 
     def __iter__(self):
+        bucket_indices_all = []
         for bucket in self.bucket_sampler:
             bucket_indices = self.indices[bucket]
             bucket_asort_seqlens = torch.argsort(self.seqlens[bucket], descending=True)
-            for batch in BatchSampler(bucket_asort_seqlens, self.batch_size, self.drop_last): #SubsetRandomSampler(list())
-                yield [bucket_indices[i] for i in batch]
+            bucket_indices_in_order = bucket_indices[bucket_asort_seqlens.numpy()]
+            bucket_indices_all.append(bucket_indices_in_order)
+
+        for bucket_indices in bucket_indices_all:
+            for batch in BatchSampler(bucket_indices, self.batch_size, self.drop_last): #SubsetRandomSampler(list())
+                yield batch
 
     def __len__(self):
         t = [math.ceil(self.len_dataset / self.n_partitions)] * self.n_partitions
