@@ -8,12 +8,14 @@ from lightning.pytorch import Trainer
 import sys
 import os
 
-config_path = str(sys.argv[1])
-logs_path = str(sys.argv[2])
-no = str(sys.argv[3])
-lr_search_mode = str(sys.argv[4])
+data_file = str(sys.argv[1])
+config_path = str(sys.argv[2])
+logs_path = str(sys.argv[3])
+no = str(sys.argv[4])
+lr_search_mode = str(sys.argv[5])
 
 config = Config(config_path)
+config["data_path"] = data_file
 
 dm = ExpressDataModule(
     config
