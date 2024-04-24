@@ -267,7 +267,7 @@ class BucketBatchSampler(BatchSampler):
         for bucket in self.bucket_sampler:
             bucket_indices = self.indices[bucket]
             bucket_asort_seqlens = torch.argsort(self.seqlens[bucket], descending=True)
-            bucket_indices_in_order = bucket_indices[bucket_asort_seqlens.numpy()]
+            bucket_indices_in_order = list(bucket_indices[bucket_asort_seqlens.numpy()])
             bucket_indices_all.append(bucket_indices_in_order)
 
         for bucket_indices in bucket_indices_all:
