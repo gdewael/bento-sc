@@ -37,7 +37,7 @@ logger = TensorBoardLogger(
 if lr_search_mode == "True":
     max_steps = 1_000
 else:
-    max_steps = 400_000
+    max_steps = 200_000
 
 trainer = Trainer(
     accelerator="gpu",
@@ -46,7 +46,7 @@ trainer = Trainer(
     plugins=[LightningEnvironment()],
     gradient_clip_val=1,
     max_steps=max_steps,
-    val_check_interval=5000,
+    val_check_interval=5_000,
     check_val_every_n_epoch=None,
     callbacks=callbacks,
     logger=logger,
