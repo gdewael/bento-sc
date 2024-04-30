@@ -271,7 +271,7 @@ class BucketBatchSampler(BatchSampler):
             bucket_indices_all.append(bucket_indices_in_order)
 
         for bucket_indices in bucket_indices_all:
-            for batch in BatchSampler(bucket_indices, self.batch_size, self.drop_last): #SubsetRandomSampler(list())
+            for batch in SubsetRandomSampler(list(BatchSampler(bucket_indices, self.batch_size, self.drop_last))): #SubsetRandomSampler(list())
                 yield batch
 
     def __len__(self):
