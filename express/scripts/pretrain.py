@@ -1,3 +1,6 @@
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
+
 from express.data import ExpressDataModule
 from express.models import ExpressTransformer
 from express.utils.config import Config
@@ -6,7 +9,6 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import sys
-import os
 
 data_file = str(sys.argv[1])
 config_path = str(sys.argv[2])
