@@ -32,8 +32,8 @@ callbacks = [
     ModelCheckpoint(every_n_train_steps=5000),
 ]
 logger = TensorBoardLogger(
-    logs_path.split("/")[0],
-    name=logs_path.split("/")[1],
+    "/".join(logs_path.split("/")[:-1]),
+    name=logs_path.split("/")[-1],
 )
 
 if lr_search_mode == "True":
