@@ -13,8 +13,8 @@ import sys
 data_file = str(sys.argv[1])
 config_path = str(sys.argv[2])
 logs_path = str(sys.argv[3])
-no = str(sys.argv[4])
-lr_search_mode = str(sys.argv[5])
+lr_search_mode = str(sys.argv[4])
+ckpt_path = str(sys.argv[5])
 
 config = Config(config_path)
 config["data_path"] = data_file
@@ -32,8 +32,8 @@ callbacks = [
     ModelCheckpoint(every_n_train_steps=5000),
 ]
 logger = TensorBoardLogger(
-    logs_path,
-    name=no,
+    logs_path.split("/")[0],
+    name=logs_path.split("/")[1],
 )
 
 if lr_search_mode == "True":
@@ -58,4 +58,4 @@ trainer = Trainer(
     use_distributed_sampler=(True if config.return_zeros else False),
 )
 
-trainer.fit(model, dm)
+trainer.fit(model, dm, ckpt_path=(None if ckpt_path=="None" else ckpt_path))
