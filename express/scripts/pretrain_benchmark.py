@@ -54,4 +54,4 @@ trainer = Trainer(
     use_distributed_sampler=(True if config.return_zeros else False),
 )
 
-trainer.fit(model)
+trainer.fit(model, dm)
