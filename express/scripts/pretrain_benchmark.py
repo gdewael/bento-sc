@@ -28,7 +28,7 @@ model = ExpressTransformer(
 
 callbacks = [
     ModelCheckpoint(every_n_train_steps=5000),
-    EarlyStopping(monitor="val_loss", patience=10, mode="min", stopping_threshold=1.23),
+    EarlyStopping(monitor="val_loss", patience=10, mode="min", stopping_threshold=1.225),
 ]
 logger = TensorBoardLogger(
     "/".join(logs_path.split("/")[:-1]),
