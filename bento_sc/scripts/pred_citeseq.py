@@ -1,7 +1,7 @@
-from express.data import ExpressDataModule
-from express.models import PerturbTransformer
-from express.baselines import PerturbBaseline
-from express.utils.config import Config
+from bento_sc.data import BentoDataModule
+from bento_sc.utils.config import Config
+from bento_sc.models import CLSTaskTransformer
+from bento_sc.baselines import CLSTaskBaseline
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch import Trainer
@@ -14,15 +14,15 @@ no = str(sys.argv[4])
 
 config = Config(config_path)
 
-dm = ExpressDataModule(
+dm = BentoDataModule(
     config
 )
 dm.setup(None)
 
 if baseline == "baseline":
-    model = PerturbBaseline(config)
+    model = CLSTaskBaseline(config)
 else:
-    model = PerturbTransformer(
+    model = CLSTaskTransformer(
         config
     )
 
@@ -36,9 +36,9 @@ logger = TensorBoardLogger(
 
 trainer = Trainer(
     accelerator="gpu",
-    devices=[0,1],
+    devices=[2],
     strategy="auto",
-    max_epochs=25,
+    max_epochs=10,
     gradient_clip_val=1,
     callbacks=callbacks,
     logger=logger,

@@ -1,7 +1,7 @@
-from express.data import ExpressDataModule
-from express.utils.config import Config
-from express.models import CLSTaskTransformer, ExpressTransformer
-from express.baselines import CLSTaskBaseline
+from bento_sc.data import BentoDataModule
+from bento_sc.utils.config import Config
+from bento_sc.models import CLSTaskTransformer, BentoTransformer
+from bento_sc.baselines import CLSTaskBaseline
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch import Trainer
@@ -24,7 +24,7 @@ elif checkpoint == "None":
         config
     )
 else:
-    pretrained_model = ExpressTransformer.load_from_checkpoint(checkpoint)
+    pretrained_model = BentoTransformer.load_from_checkpoint(checkpoint)
     config_pretrained = pretrained_model.hparams.config
     print(
         "Pretrained model used. Ignoring following keys in config: " +
@@ -69,7 +69,7 @@ else:
     model.load_state_dict(model_dict)
 
 
-dm = ExpressDataModule(
+dm = BentoDataModule(
     config
 )
 dm.setup(None)

@@ -1,5 +1,6 @@
-# express
-scRNA-seq transformer benchmarking
+# bento-sc
+
+BENchmarking Transformer-Obtained Single-Cell embeddings
 
 
 ## Todos

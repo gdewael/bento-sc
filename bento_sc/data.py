@@ -14,7 +14,7 @@ from torch.utils.data import *
 import math
 
 
-class ExpressDataModule(LightningDataModule):
+class BentoDataModule(LightningDataModule):
     def __init__(self, config):
         super().__init__()
         self.config = deepcopy(config)
@@ -371,7 +371,7 @@ class PerturbationCellSampleProcessor:
         )
 
         self.n_genes = n_genes
-        path = files("express.utils.data").joinpath("gene_set_perturb.txt")
+        path = files("bento_sc.utils.data").joinpath("gene_set_perturb.txt")
         self.gene_indices = torch.tensor(np.loadtxt(path).astype(int))
 
     def __call__(self, f, sample):
@@ -510,7 +510,7 @@ class FilterTopGenes:
 class FilterHVG:
     def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024, dataset="cellxgene"):
         assert dataset in ["cellxgene", "citeseq", "greatapes"]
-        path = files("express.utils.data").joinpath("hvg_%s.npy" % dataset)
+        path = files("bento_sc.utils.data").joinpath("hvg_%s.npy" % dataset)
         var = np.load(path)
         asort = np.argsort(var)[::-1][:number]
         self.to_select = torch.sort(torch.tensor(asort.copy())).values 
@@ -542,7 +542,7 @@ class FilterRandomGenes:
         self.n = number
         self.affected_keys = affected_keys
         if proportional_hvg:
-            path = files("express.utils.data").joinpath("hvg_cellxgene.npy")
+            path = files("bento_sc.utils.data").joinpath("hvg_cellxgene.npy")
             var = np.load(path)
             self.p = np.exp(np.log10(var+1e-8)/5)/np.exp(np.log10(var+1e-8)/5).sum()
         self.proportional_hvg = proportional_hvg

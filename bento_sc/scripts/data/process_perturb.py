@@ -56,7 +56,7 @@ for ff in f["obs/gene_id"][:]:
 
 new_pert_array = np.array(new_pert_array, allow_pickle=True)
 
-splits = np.load("../express/express/utils/data/split_pert.npz")
+splits = np.load("../bento-sc/bento_sc/utils/data/split_pert.npz")
 split = splits["split"]
 matched_control = splits["matched_control"]
 train_control_indices = splits["train_control_indices"]

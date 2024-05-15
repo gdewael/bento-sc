@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import lightning.pytorch as pl
 from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
-from express import loss
+from bento_sc import loss
 from scipy.stats import spearmanr
 from torchmetrics.classification import MulticlassAccuracy
 import numpy as np
@@ -31,7 +31,7 @@ class EmbeddingPseudoQuantizer(nn.Module):
         return y
 
 
-class ExpressTransformer(pl.LightningModule):
+class BentoTransformer(pl.LightningModule):
     def __init__(
         self,
         config
@@ -188,7 +188,7 @@ class ExpressTransformer(pl.LightningModule):
 
 
 
-class PerturbTransformer(ExpressTransformer):
+class PerturbTransformer(BentoTransformer):
     def __init__(
         self,
         config
@@ -277,7 +277,7 @@ class PerturbTransformer(ExpressTransformer):
     def config_used(self):
         return {"n_discrete_tokens", "dim", "pseudoquant_input", "gate_input", "depth", "dropout", "n_genes", "loss", "lr"}
 
-class CLSTaskTransformer(ExpressTransformer):
+class CLSTaskTransformer(BentoTransformer):
     def __init__(
         self,
         config

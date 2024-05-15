@@ -17,14 +17,14 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_samples
 from sklearn.preprocessing import StandardScaler
-from express.data import ExpressDataModule
-from express.utils.config import Config
+from bento_sc.data import BentoDataModule
+from bento_sc.utils.config import Config
 
 from tqdm import tqdm
 
 config = Config(config_path)
 
-dm = ExpressDataModule(
+dm = BentoDataModule(
     config
 )
 dm.setup(None)

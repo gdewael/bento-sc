@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ExpressLoss(nn.Module):
+class BentoLoss(nn.Module):
     def __init__(self, in_dim, out_dim, reduction="mean"):
         super().__init__()
 
@@ -26,7 +26,7 @@ class ExpressLoss(nn.Module):
         raise NotImplementedError
 
 
-class BinCE(ExpressLoss):
+class BinCE(BentoLoss):
     def __init__(self, dim, n_bins, reduction="mean"):
         super().__init__(dim, n_bins, reduction=reduction)
 
@@ -41,7 +41,7 @@ class BinCE(ExpressLoss):
         return self.loss(y, targets)
 
 
-class CountMSE(ExpressLoss):
+class CountMSE(BentoLoss):
     def __init__(self, dim, exp_output=True, lib_norm=False, reduction="mean"):
         super().__init__(dim, 1, reduction=reduction)
         assert not (not exp_output and lib_norm), "lib norm true needs exp output True"
@@ -65,7 +65,7 @@ class CountMSE(ExpressLoss):
         return self.loss(y, targets.to(y.dtype))
 
 
-class PoissonNLL(ExpressLoss):
+class PoissonNLL(BentoLoss):
     def __init__(
         self,
         dim,
@@ -105,7 +105,7 @@ class PoissonNLL(ExpressLoss):
         return self.loss(y, targets)
 
 
-class NegativeBinomialNLL(ExpressLoss):
+class NegativeBinomialNLL(BentoLoss):
     def __init__(
         self,
         dim,
@@ -225,7 +225,7 @@ class ZeroInflatedNegativeBinomialNLL(NegativeBinomialNLL):
         return self.loss(mus, log_thetas, pis, targets)
 
 
-class NCELoss(ExpressLoss):
+class NCELoss(BentoLoss):
     def __init__(
         self,
         dim,
@@ -253,7 +253,7 @@ class NCELoss(ExpressLoss):
         return self.loss(y)
 
 
-class CellTypeClfLoss(ExpressLoss):
+class CellTypeClfLoss(BentoLoss):
     def __init__(
         self,
         dim,
@@ -272,7 +272,7 @@ class CellTypeClfLoss(ExpressLoss):
         y = self.predict(x)
         return self.loss(y, targets)
 
-class ModalityPredictionLoss(ExpressLoss):
+class ModalityPredictionLoss(BentoLoss):
     def __init__(
         self,
         dim,

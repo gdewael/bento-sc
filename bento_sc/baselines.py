@@ -2,8 +2,8 @@ import torch
 from torch import optim, nn
 import torch.nn.functional as F
 import lightning.pytorch as pl
-from express.utils.config import Config
-from express import loss
+from bento_sc.utils.config import Config
+from bento_sc import loss
 from scipy.stats import spearmanr
 import numpy as np
 from torchmetrics.classification import MulticlassAccuracy

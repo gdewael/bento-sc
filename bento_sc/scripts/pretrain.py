@@ -1,10 +1,10 @@
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:2048"
 
-from express.data import ExpressDataModule
-from express.models import ExpressTransformer
-from express.utils.config import Config
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from bento_sc.data import BentoDataModule
+from bento_sc.models import BentoTransformer
+from bento_sc.utils.config import Config
+from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
@@ -13,31 +13,35 @@ import sys
 data_file = str(sys.argv[1])
 config_path = str(sys.argv[2])
 logs_path = str(sys.argv[3])
+lr_search_mode = str(sys.argv[4])
+ckpt_path = str(sys.argv[5])
 
 config = Config(config_path)
 config["data_path"] = data_file
 
-dm = ExpressDataModule(
+dm = BentoDataModule(
     config
 )
 dm.setup(None)
 
-model = ExpressTransformer(
+model = BentoTransformer(
     config
 )
 
 callbacks = [
     ModelCheckpoint(every_n_train_steps=5000),
-    EarlyStopping(monitor="val_loss", patience=10, mode="min", stopping_threshold=1.225),
 ]
 logger = TensorBoardLogger(
     "/".join(logs_path.split("/")[:-1]),
     name=logs_path.split("/")[-1],
 )
 
-
-max_steps = 100_001
-val_check_interval = 500
+if lr_search_mode == "True":
+    max_steps = 2_501
+    val_check_interval = 250
+else:
+    max_steps = 200_000
+    val_check_interval = 5_000
 
 trainer = Trainer(
     accelerator="gpu",
@@ -54,4 +58,4 @@ trainer = Trainer(
     use_distributed_sampler=(True if config.return_zeros else False),
 )
 
-trainer.fit(model, dm)
+trainer.fit(model, dm, ckpt_path=(None if ckpt_path=="None" else ckpt_path))
