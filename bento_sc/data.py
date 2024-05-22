@@ -139,14 +139,11 @@ class BentoDataModule(LightningDataModule):
                     (isinstance(self.config.devices, int) and self.config.devices > 1)
                 ):
                 batch_sampler = DistributedBucketSampler(dataset, self.config.batch_size, n_partitions=n_partitions)
-                print("option1", flush = True)
             else:
                 batch_sampler = BucketBatchSampler(dataset, self.config.batch_size, n_partitions=n_partitions)
-                print("option2", flush = True)
 
         else:
             batch_sampler = None
-            print("option3", flush = True)
         return batch_sampler
     
     @property
