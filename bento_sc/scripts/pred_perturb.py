@@ -1,5 +1,5 @@
 from bento_sc.data import BentoDataModule
-from bento_sc.models import PerturbTransformer
+from bento_sc.models import PerturbTransformer, BentoTransformer
 from bento_sc.baselines import PerturbBaseline
 from bento_sc.utils.config import Config
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
@@ -8,7 +8,7 @@ from lightning.pytorch import Trainer
 import sys
 
 config_path = str(sys.argv[1])
-baseline = str(sys.argv[2])
+approach = str(sys.argv[2])
 logs_path = str(sys.argv[3])
 no = str(sys.argv[4])
 
@@ -19,12 +19,21 @@ dm = BentoDataModule(
 )
 dm.setup(None)
 
-if baseline == "baseline":
+if approach == "baseline":
     model = PerturbBaseline(config)
+elif approach == "None":
+    model = PerturbTransformer(config)
 else:
-    model = PerturbTransformer(
-        config
-    )
+    model = PerturbTransformer(config)
+    pretrained_model = BentoTransformer.load_from_checkpoint(approach)
+
+    pretrained_dict = pretrained_model.state_dict()
+    model_dict = model.state_dict()
+    pretrained_dict_new = {
+        k: v for k, v in pretrained_dict.items() if not k.startswith(("nce_loss", "ct_clf_loss", "loss"))
+    }
+    model_dict.update(pretrained_dict_new)
+    model.load_state_dict(model_dict)
 
 val_ckpt = ModelCheckpoint(monitor="val_loss", mode="min")
 callbacks = [val_ckpt, EarlyStopping(monitor="val_loss", patience=10, mode="min")]
@@ -36,9 +45,9 @@ logger = TensorBoardLogger(
 
 trainer = Trainer(
     accelerator="gpu",
-    devices=[0,1],
+    devices=config.devices,
     strategy="auto",
-    max_epochs=25,
+    max_epochs=200,
     gradient_clip_val=1,
     callbacks=callbacks,
     logger=logger,

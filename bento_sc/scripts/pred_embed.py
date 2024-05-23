@@ -16,7 +16,6 @@ import torch
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_samples
-from sklearn.preprocessing import StandardScaler
 from bento_sc.data import BentoDataModule
 from bento_sc.utils.config import Config
 

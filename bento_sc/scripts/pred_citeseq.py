@@ -14,9 +14,8 @@ no = str(sys.argv[4])
 
 config = Config(config_path)
 
-dm = BentoDataModule(
-    config
-)
+dm = BentoDataModule(config)
+
 dm.setup(None)
 
 if approach == "baseline":
@@ -35,8 +34,8 @@ else:
     model_dict.update(pretrained_dict_new)
     model.load_state_dict(model_dict)
 
-val_ckpt = ModelCheckpoint(monitor="val_macro_spearman", mode="min")
-callbacks = [val_ckpt, EarlyStopping(monitor="val_macro_spearman", patience=20, mode="min")]
+val_ckpt = ModelCheckpoint(monitor="val_macro_spearman", mode="max")
+callbacks = [val_ckpt, EarlyStopping(monitor="val_macro_spearman", patience=20, mode="max")]
 
 logger = TensorBoardLogger(
     logs_path,

@@ -37,7 +37,7 @@ class PerturbBaseline(pl.LightningModule):
         dim_per_gene = self.config.baseline_perturb_dim_per_gene
         bottleneck_dim = self.config.baseline_perturb_bottleneck_dim
 
-        self.perturbation_indicator = nn.Parameter(torch.empty(dim_per_gene).uniform_(-1, 1))
+        self.perturbation_indicator = nn.Parameter(torch.empty(dim_per_gene).uniform_(-1, 1)/self.config.perturb_init_factor)
 
         self.to_embed = nn.Linear(1, dim_per_gene) # B, G, 1 -> B, G, H1
         self.mixer = nn.Sequential(
@@ -76,8 +76,12 @@ class PerturbBaseline(pl.LightningModule):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y = self(batch)
+        if self.config.pred_post_pert:
+            target = batch["gene_counts_true"]-batch["gene_counts_copy"]
+        else:
+            target = batch["gene_counts_true"]
         
-        loss = F.mse_loss(y, batch["gene_counts_true"].to(y.dtype))
+        loss = F.mse_loss(y, target.to(y.dtype))
 
         self.log("train_loss", loss , sync_dist=True)
         return loss
@@ -86,31 +90,41 @@ class PerturbBaseline(pl.LightningModule):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y = self(batch)
+        if self.config.pred_post_pert:
+            target = batch["gene_counts_true"]-batch["gene_counts_copy"]
+        else:
+            target = batch["gene_counts_true"]
         
-        loss = F.mse_loss(y, batch["gene_counts_true"].to(y.dtype))
+        loss = F.mse_loss(y, target.to(y.dtype))
 
         self.log("val_loss", loss, sync_dist=True)
 
         self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu(), batch["gene_counts_copy"].cpu()))
 
-    def on_validation_epoch_end(self):
-        all_preds = torch.cat([s[0] for s in self.validation_step_outputs])
-        all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
-        all_origs = torch.cat([s[2] for s in self.validation_step_outputs])
-        true_expr_change = all_trues - all_origs
-        pred_expr_change = all_preds - all_origs
+    def on_validation_epoch_end(self):     
+        true_pert_prof = torch.cat([s[1] for s in self.validation_step_outputs])
+        orig_prof = torch.cat([s[2] for s in self.validation_step_outputs])
+
+        if self.config.pred_post_pert:
+            pred_expr_change = torch.cat([s[0] for s in self.validation_step_outputs])
+            pred_pert_prof = pred_expr_change + orig_prof
+        else:
+            pred_pert_prof = torch.cat([s[0] for s in self.validation_step_outputs])
+            pred_expr_change = pred_pert_prof - orig_prof
+
+        true_expr_change = true_pert_prof - orig_prof
 
         delta_spearmans = []
         for i in range(len(true_expr_change)):
             s = spearmanr(pred_expr_change[i].float().numpy(), true_expr_change[i].float().numpy()).statistic
             delta_spearmans.append(s)
-        self.log("val_deltaspearman(IC)", np.mean(delta_spearmans))
+        self.log("val_deltaspearman", np.mean(delta_spearmans), sync_dist=True)
 
         spearmans = []
         for i in range(len(true_expr_change)):
-            s = spearmanr(all_preds[i].float().numpy(), all_trues[i].float().numpy()).statistic
+            s = spearmanr(pred_pert_prof[i].float().numpy(), true_pert_prof[i].float().numpy()).statistic
             spearmans.append(s)
-        self.log("val_spearman(IC)", np.mean(spearmans))
+        self.log("val_spearman", np.mean(spearmans), sync_dist=True)
 
         self.validation_step_outputs.clear()
 
