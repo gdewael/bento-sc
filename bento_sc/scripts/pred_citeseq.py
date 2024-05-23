@@ -35,8 +35,8 @@ else:
     model_dict.update(pretrained_dict_new)
     model.load_state_dict(model_dict)
 
-val_ckpt = ModelCheckpoint(monitor="val_loss", mode="min")
-callbacks = [val_ckpt, EarlyStopping(monitor="val_loss", patience=10, mode="min")]
+val_ckpt = ModelCheckpoint(monitor="val_macro_spearman", mode="min")
+callbacks = [val_ckpt, EarlyStopping(monitor="val_macro_spearman", patience=20, mode="min")]
 
 logger = TensorBoardLogger(
     logs_path,
@@ -47,7 +47,7 @@ trainer = Trainer(
     accelerator="gpu",
     devices=config.devices,
     strategy="auto",
-    max_epochs=100,
+    max_epochs=200,
     gradient_clip_val=1,
     callbacks=callbacks,
     logger=logger,
