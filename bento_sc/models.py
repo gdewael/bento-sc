@@ -158,6 +158,11 @@ class BentoTransformer(pl.LightningModule):
 
         self.log("val_loss", loss, sync_dist=True)
 
+    def predict_step(self, batch):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        y = self(batch)
+        return (batch["0/obs"], y[:, 0])
+
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
 

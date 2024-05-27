@@ -1,55 +1,73 @@
-import sys
-config_path = str(sys.argv[1])
-baseline = str(sys.argv[2])
-n_threads = str(sys.argv[3])
-embeddings_save_path = str(sys.argv[4])
 
-import os
-os.environ["NUMBA_NUM_THREADS"] = n_threads
-os.environ["OMP_NUM_THREADS"] = n_threads
-os.environ["OPENBLAS_NUM_THREADS"] = n_threads
-os.environ["MKL_NUM_THREADS"] = n_threads
-os.environ["VECLIB_MAXIMUM_THREADS"] = n_threads
-os.environ["NUMEXPR_NUM_THREADS"] = n_threads
 
 import torch
 import numpy as np
-from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_samples
 from bento_sc.data import BentoDataModule
+from bento_sc.models import BentoTransformer
+from lightning.pytorch.plugins.environments import LightningEnvironment
+from lightning.pytorch import Trainer
 from bento_sc.utils.config import Config
-
 from tqdm import tqdm
+import argparse
 
-config = Config(config_path)
 
-dm = BentoDataModule(
-    config
-)
-dm.setup(None)
+def main():
+    class CustomFormatter(
+        argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
+    ):
+        pass
 
-embeds = []
-obs = []
-for batch in tqdm(dm.test_dataloader()):
-    embeds.append(batch["gene_counts"])
-    obs.append(batch["0/obs"])
+    parser = argparse.ArgumentParser(
+        description="Training script for modality prediction.",
+        formatter_class=CustomFormatter,
+    )
 
-embeds = torch.cat(embeds).numpy()
-obs = torch.cat(obs).numpy()
+    parser.add_argument("config_path", type=str, metavar="config_path", help="config_path")
+    parser.add_argument("approach", type=str, metavar="approach", help="approach")
+    parser.add_argument("save_path", type=str, metavar="save_path", help="save_path")
+    args = parser.parse_args()
 
-#ss = StandardScaler()
-pca = PCA(n_components=64)
-#embeds = ss.fit_transform(embeds)
-embeds = pca.fit_transform(embeds)
+    config = Config(args.config_path)
 
-def ASWct(embeddings, celltypes):
-    k = silhouette_samples(embeddings, celltypes)
-    return np.mean((k + 1)/2)
+    dm = BentoDataModule(
+        config
+    )
+    dm.setup(None)
+    
 
-def ASWbatch(embeddings, batch):
-    k = silhouette_samples(embeddings, batch)
-    return np.mean(1 - np.abs(k))
+    if args.approach == "baseline":
+        embeds = []
+        obs = []
+        for batch in tqdm(dm.predict_dataloader()):
+            embeds.append(batch["gene_counts"])
+            obs.append(batch["0/obs"])
 
-print(ASWct(embeds, obs[:, 3]))
-print(ASWbatch(embeds, obs[:, 0]))
-np.save(embeddings_save_path, embeds)
+        embeds = torch.cat(embeds).numpy()
+        obs = torch.cat(obs).numpy()
+
+    else:
+        model = BentoTransformer(
+            config
+        )
+
+        trainer = Trainer(
+            accelerator="gpu",
+            devices=config.devices,
+            strategy="auto",
+            plugins=[LightningEnvironment()],
+            logger=False,
+            enable_checkpointing=False,
+            precision="bf16-true",
+            use_distributed_sampler=(True if config.return_zeros else False),
+        )
+
+        preds = trainer.predict(model, datamodule=dm, ckpt_path=(None if args.approach == "None" else args.approach))
+        obs = torch.cat([p[0] for p in preds]).numpy()
+        embeds = torch.cat([p[1] for p in preds]).float().numpy()
+
+
+    np.savez(args.save_path, obs=obs, embeds=embeds)
+
+
+if __name__ == "__main__":
+    main()

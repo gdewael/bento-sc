@@ -4,6 +4,7 @@ from bento_sc.baselines import PerturbBaseline
 from bento_sc.utils.config import Config
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import argparse
 
@@ -57,7 +58,7 @@ def main():
         model.load_state_dict(model_dict)
 
     val_ckpt = ModelCheckpoint(monitor="val_loss", mode="min")
-    callbacks = [val_ckpt, EarlyStopping(monitor="val_loss", patience=10, mode="min")]
+    callbacks = [val_ckpt, EarlyStopping(monitor="val_loss", patience=20, mode="min")]
 
     logger = TensorBoardLogger(
         "/".join(args.logs_path.split("/")[:-1]),
@@ -68,11 +69,14 @@ def main():
         accelerator="gpu",
         devices=config.devices,
         strategy="auto",
-        max_epochs=200,
+        plugins=[LightningEnvironment()],
         gradient_clip_val=1,
+        max_steps=200_000,
+        val_check_interval=2_000,
         callbacks=callbacks,
         logger=logger,
         precision="bf16-true",
+        use_distributed_sampler=(True if config.return_zeros else False),
     )
 
     trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())

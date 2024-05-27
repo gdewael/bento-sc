@@ -117,11 +117,9 @@ class BentoDataModule(LightningDataModule):
         )
 
     def test_dataloader(self):
-        batch_sampler = self.configure_batch_sampler(self.test, n_partitions = 1)
-        if batch_sampler is not None:
-            extra_kwargs = {}
-        else:
-            extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": False}
+        batch_sampler = None
+
+        extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": False}
 
         return torch.utils.data.DataLoader(
             self.test,
@@ -145,6 +143,9 @@ class BentoDataModule(LightningDataModule):
         else:
             batch_sampler = None
         return batch_sampler
+
+    def predict_dataloader(self):
+        return self.test_dataloader()
     
     @property
     def config_used(self):
@@ -239,8 +240,9 @@ class BucketBatchSampler(BatchSampler):
         batch_size,
         n_partitions = 100,
         indices = None,
+        drop_last=False,
     ):
-        super().__init__(dataset, batch_size, False)
+        super().__init__(dataset, batch_size, drop_last)
 
         self.len_dataset = (len(dataset) if indices is None else len(indices))
 
@@ -287,6 +289,7 @@ class DistributedBucketSampler(DistributedSampler):
         rank=None,
         shuffle=True,
         seed=0,
+        drop_last=False,
     ):
         super().__init__(
             dataset,
@@ -294,7 +297,7 @@ class DistributedBucketSampler(DistributedSampler):
             rank=rank,
             shuffle=shuffle,
             seed=seed,
-            drop_last=False
+            drop_last=drop_last
         )
 
         self.batch_size = batch_size

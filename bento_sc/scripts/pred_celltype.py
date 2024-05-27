@@ -4,6 +4,7 @@ from bento_sc.models import CLSTaskTransformer, BentoTransformer
 from bento_sc.baselines import CLSTaskBaseline
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import argparse
 
@@ -80,12 +81,14 @@ def main():
         accelerator="gpu",
         devices=config.devices,
         strategy="auto",
+        plugins=[LightningEnvironment()],
         max_steps=500_000,
         val_check_interval=2_000,
         gradient_clip_val=1,
         callbacks=callbacks,
         logger=logger,
         precision="bf16-true",
+        use_distributed_sampler=(True if config.return_zeros else False),
     )
 
     trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())
