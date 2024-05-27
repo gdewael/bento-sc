@@ -17,12 +17,14 @@ def boolean(v):
     else:
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
-class CustomFormatter(
-    argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
-):
-    pass
+
 
 def main():
+    class CustomFormatter(
+        argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
+    ):
+        pass
+
     parser = argparse.ArgumentParser(
         description="Training script for celltype clf.",
         formatter_class=CustomFormatter,
@@ -35,7 +37,7 @@ def main():
     parser.add_argument("--transfer_ct_clf_loss", type=boolean, default=False, help="Whether to transfer ct clf loss from pre-trained model.")
 
     if args.lr is not None:
-        config.lr = args.lr
+        config["lr"] = args.lr
 
     args = parser.parse_args()
 
@@ -87,3 +89,7 @@ def main():
     )
 
     trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())
+
+
+if __name__ == "__main__":
+    main()

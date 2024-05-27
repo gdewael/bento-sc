@@ -10,10 +10,7 @@ from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import argparse
 
-class CustomFormatter(
-    argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
-):
-    pass
+
 
 def boolean(v):
     if isinstance(v, bool):
@@ -26,6 +23,10 @@ def boolean(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 def main():
+    class CustomFormatter(
+        argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
+    ):
+        pass
 
     parser = argparse.ArgumentParser(
         description="Pre-training script.",
@@ -45,9 +46,9 @@ def main():
     config = Config(args.config_path)
 
     if args.data_path is not None:
-        config.data_path = args.data_path
+        config["data_path"] = args.data_path
     if args.lr is not None:
-        config.lr = args.lr
+        config["lr"] = args.lr
 
     dm = BentoDataModule(
         config
@@ -89,3 +90,6 @@ def main():
     )
 
     trainer.fit(model, dm, ckpt_path=args.ckpt_path)
+
+if __name__ == "__main__":
+    main()

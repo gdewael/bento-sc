@@ -7,12 +7,14 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch import Trainer
 import argparse
 
-class CustomFormatter(
-    argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
-):
-    pass
+
 
 def main():
+    class CustomFormatter(
+        argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
+    ):
+        pass
+
     parser = argparse.ArgumentParser(
         description="Training script for post-perturbation expression prediction.",
         formatter_class=CustomFormatter,
@@ -29,11 +31,10 @@ def main():
     config = Config(args.config_path)
 
     if args.lr is not None:
-        config.lr = args.lr
+        config["lr"] = args.lr
     if args.init_factor is not None:
-        config.perturb_init_factor = args.init_factor
+        config["perturb_init_factor"] = args.init_factor
     
-
     dm = BentoDataModule(
         config
     )
@@ -75,3 +76,6 @@ def main():
     )
 
     trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())
+
+if __name__ == "__main__":
+    main()
