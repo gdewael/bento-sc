@@ -8,7 +8,15 @@ from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import argparse
 
-
+def boolean(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 def main():
     class CustomFormatter(
@@ -26,6 +34,8 @@ def main():
     parser.add_argument("logs_path", type=str, metavar="logs_path", help="logs_path")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate. Overrides value in config file if specified")
     parser.add_argument("--init_factor", type=float, default=None, help="init_factor. Overrides value in config file if specified")
+    parser.add_argument("--tune_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
+
 
     args = parser.parse_args()
 
@@ -65,14 +75,21 @@ def main():
         name=args.logs_path.split("/")[-1],
     )
 
+    if args.tune_mode:
+        max_steps = 2_501
+        val_check_interval = 250
+    else:
+        max_steps = 200_000
+        val_check_interval = 2_000
+
     trainer = Trainer(
         accelerator="gpu",
         devices=config.devices,
         strategy="auto",
         plugins=[LightningEnvironment()],
         gradient_clip_val=1,
-        max_steps=200_000,
-        val_check_interval=2_000,
+        max_steps=max_steps,
+        val_check_interval=val_check_interval,
         callbacks=callbacks,
         logger=logger,
         precision="bf16-true",
