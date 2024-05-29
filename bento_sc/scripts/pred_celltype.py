@@ -38,12 +38,12 @@ def main():
     parser.add_argument("--transfer_ct_clf_loss", type=boolean, default=False, help="Whether to transfer ct clf loss from pre-trained model.")
     parser.add_argument("--tune_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
 
+    args = parser.parse_args()
+
     if args.lr is not None:
         config["lr"] = args.lr
     if args.data_path is not None:
         config["data_path"] = args.data_path
-
-    args = parser.parse_args()
 
     config = Config(args.config_path)
 
