@@ -40,12 +40,12 @@ def main():
 
     args = parser.parse_args()
 
+    config = Config(args.config_path)
+
     if args.lr is not None:
         config["lr"] = args.lr
     if args.data_path is not None:
         config["data_path"] = args.data_path
-
-    config = Config(args.config_path)
 
     dm = BentoDataModule(config)
 
