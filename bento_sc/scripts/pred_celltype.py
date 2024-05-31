@@ -85,7 +85,7 @@ def main():
         val_check_interval = 250
     else:
         max_steps = 500_000
-        val_check_interval = 2_000
+        val_check_interval = 5_000
 
     trainer = Trainer(
         accelerator="gpu",

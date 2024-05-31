@@ -602,7 +602,7 @@ class CountsAsPositions:
             - Gene index: RankCounts Gene counts
             - Gene counts true: Gene index
             - Gene counts: Gene index
-        Make sure these have been run before performing this step:
+        To train Geneformer-style, make sure these have been run before performing this step:
             RankCounts gene counts
             FilterTop
         """
