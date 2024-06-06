@@ -33,7 +33,7 @@ def pca_to_umap(input_file_pca, output_file_umap):
     inputs = np.load(input_file_pca)
     obs = inputs["obs"]
     embeds = inputs["embeds"]
-    reducer = umap.UMAP(verbose=True)
+    reducer = umap.UMAP(verbose=True, min_dist=0.5)
     embeds_umap = reducer.fit_transform(embeds)
     np.savez(output_file_umap, obs=obs, embeds=embeds_umap)
     return obs, embeds_umap
