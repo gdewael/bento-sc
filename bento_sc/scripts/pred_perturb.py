@@ -67,8 +67,8 @@ def main():
         model_dict.update(pretrained_dict_new)
         model.load_state_dict(model_dict)
 
-    val_ckpt = ModelCheckpoint(monitor="val_loss", mode="min")
-    callbacks = [val_ckpt, EarlyStopping(monitor="val_loss", patience=20, mode="min")]
+    val_ckpt = ModelCheckpoint(monitor="val_deltaspearman", mode="max")
+    callbacks = [val_ckpt, EarlyStopping(monitor="val_deltaspearman", patience=40, mode="max")]
 
     logger = TensorBoardLogger(
         "/".join(args.logs_path.split("/")[:-1]),
@@ -79,8 +79,8 @@ def main():
         max_steps = 2_501
         val_check_interval = 250
     else:
-        max_steps = 200_000
-        val_check_interval = 2_000
+        max_steps = 50_000
+        val_check_interval = 1000
 
     trainer = Trainer(
         accelerator="gpu",

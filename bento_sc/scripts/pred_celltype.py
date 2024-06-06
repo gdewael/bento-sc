@@ -73,7 +73,7 @@ def main():
 
 
     val_ckpt = ModelCheckpoint(monitor="val_macroacc", mode="max")
-    callbacks = [val_ckpt, EarlyStopping(monitor="val_macroacc", patience=20, mode="max")]
+    callbacks = [val_ckpt, EarlyStopping(monitor="val_macroacc", patience=40, mode="max")]
 
     logger = TensorBoardLogger(
         "/".join(args.logs_path.split("/")[:-1]),
