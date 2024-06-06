@@ -90,10 +90,12 @@ def main():
         gradient_clip_val=1,
         max_steps=max_steps,
         val_check_interval=val_check_interval,
+        check_val_every_n_epoch=None,
         callbacks=callbacks,
         logger=logger,
         precision="bf16-true",
         use_distributed_sampler=(True if config.return_zeros else False),
+        accumulate_grad_batches=4,
     )
 
     trainer.fit(model, dm.train_dataloader(), dm.val_dataloader())

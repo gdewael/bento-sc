@@ -94,6 +94,7 @@ def main():
         plugins=[LightningEnvironment()],
         max_steps=max_steps,
         val_check_interval=val_check_interval,
+        check_val_every_n_epoch=None,
         gradient_clip_val=1,
         callbacks=callbacks,
         logger=logger,
