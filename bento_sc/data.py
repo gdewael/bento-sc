@@ -596,7 +596,7 @@ class Copy:
         return sample
     
 class CountsAsPositions:
-    def __init__(self):
+    def __init__(self, skip_trues=False,):
         """
         Used for Geneformer-style pre-training:
             - Gene index: RankCounts Gene counts
@@ -606,13 +606,15 @@ class CountsAsPositions:
             RankCounts gene counts
             FilterTop
         """
-        pass
+        self.skip_trues = skip_trues
+
     def __call__(self, sample):
         gene_index = sample["gene_index"].clone()
         gene_counts = sample["gene_counts"].clone()
         sample["gene_index"] = gene_counts
         sample["gene_counts"] = gene_index
-        sample["gene_counts_true"] = gene_index
+        if not self.skip_trues:
+            sample["gene_counts_true"] = gene_index
         return sample
 
 class GaussianResample:

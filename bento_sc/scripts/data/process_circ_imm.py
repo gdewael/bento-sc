@@ -4,8 +4,9 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from tqdm import tqdm
 
-INPUT_FILE = "/data/home/gaetandw/express/data/great_apes.h5ad"
-OUTPUT_FILE = "/data/home/gaetandw/express/data/great_apes_final.h5t"
+# cellxgene_census.download_source_h5ad("4e4edb6d-402a-4399-a91d-7e1dca7b3b87", "../data/circ_imm.h5ad")
+INPUT_FILE = "/data/home/gaetandw/express/data/circ_imm.h5ad"
+OUTPUT_FILE = "/data/home/gaetandw/express/data/circ_imm.h5t"
 CXG_FILE = "/data/home/gaetandw/express/data/cellxgene.h5t"
 
 f = h5py.File(INPUT_FILE)
@@ -16,18 +17,15 @@ assay_codes = f["obs/assay/codes"][:]
 cell_type_cats = f["obs/cell_type/categories"][:]
 cell_type_codes = f["obs/cell_type/codes"][:]
 
-dev_cats = f["obs/development_stage/categories"][:]
-dev_codes = f["obs/development_stage/codes"][:]
-
 donor_cats = f["obs/donor_id/categories"][:]
 donor_codes = f["obs/donor_id/codes"][:]
 
 matrix = csr_matrix((f["raw/X/data"][:], f["raw/X/indices"][:], f["raw/X/indptr"][:])).toarray()
 
-gene_ids =f["var/gene"][:]
+gene_ids = f["var/feature_name/categories"][:][f["var/feature_name/codes"][:]]
 
 f_cxg = h5py.File(CXG_FILE)
-gene_ids_cxg = f_cxg["1/var"][:, 0]
+gene_ids_cxg = f_cxg["1/var"][:, 1]
 
 
 indices_map = []
@@ -55,7 +53,7 @@ f.register(
     csr_load_sparse=True
 )
 
-obs = np.stack([assay_codes, dev_codes, donor_codes, cell_type_codes]).T
+obs = np.stack([assay_codes, donor_codes, cell_type_codes]).T
 f.register(
     obs,
     axis=0,
@@ -73,17 +71,9 @@ f.register(
 )
 
 f.register(
-    dev_cats.astype(bytes),
-    axis="unstructured",
-    name="1_development_stage_categories",
-    dtype_save="bytes",
-    dtype_load="str"
-)
-
-f.register(
     donor_cats.astype(bytes),
     axis="unstructured",
-    name="2_donor_categories",
+    name="1_donor_categories",
     dtype_save="bytes",
     dtype_load="str"
 )
@@ -96,10 +86,6 @@ f.register(
     dtype_load="str"
 )
 
-
-# OR 
-# split[f["0/obs"][:][:,0] == 1] = "test"
-# split[f["0/obs"][:][:,0] == 0] = "DISCARD"
 split = np.full((len(obs)), "test")
 f.register(
     split,

@@ -4,6 +4,14 @@ input_file_pca = str(sys.argv[2])
 output_file_pca = str(sys.argv[3]) 
 output_file_umap = str(sys.argv[4])
 steps = str(sys.argv[5]) #"pca", "umap", "both"
+ct_col = int(sys.argv[6])
+batch_cols = str(sys.argv[7])
+
+if "," in batch_cols:
+    batch_cols = ",".split(batch_cols)
+    batch_cols = [int(b) for b in batch_cols]
+else:
+    batch_cols = [int(batch_cols)]
 
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_samples
@@ -25,8 +33,9 @@ def raw_to_pca(input_file_raw, output_file_pca):
 
     embeds_pca = PCA(n_components=64).fit_transform(embeds)
     np.savez(output_file_pca, obs=obs, embeds=embeds_pca)
-    print(ASWct(embeds_pca, obs[:, 3]))
-    print(ASWbatch(embeds_pca, obs[:, 0]))
+    print(ASWct(embeds_pca, obs[:, ct_col]))
+    for b in batch_cols:
+        print(ASWbatch(embeds_pca, obs[:, b]))
     return obs, embeds_pca
 
 def pca_to_umap(input_file_pca, output_file_umap):

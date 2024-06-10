@@ -25,9 +25,13 @@ def main():
     parser.add_argument("config_path", type=str, metavar="config_path", help="config_path")
     parser.add_argument("approach", type=str, metavar="approach", help="approach")
     parser.add_argument("save_path", type=str, metavar="save_path", help="save_path")
+    parser.add_argument("--data_path", type=str, default=None, help="Data file. Overrides value in config file if specified")
     args = parser.parse_args()
 
     config = Config(args.config_path)
+
+    if args.data_path is not None:
+        config["data_path"] = args.data_path
 
     dm = BentoDataModule(
         config
