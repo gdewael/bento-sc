@@ -8,7 +8,7 @@ ct_col = int(sys.argv[6])
 batch_cols = str(sys.argv[7])
 
 if "," in batch_cols:
-    batch_cols = ",".split(batch_cols)
+    batch_cols = batch_cols.split(",")
     batch_cols = [int(b) for b in batch_cols]
 else:
     batch_cols = [int(batch_cols)]
