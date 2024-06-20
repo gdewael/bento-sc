@@ -80,7 +80,7 @@ def main():
         val_check_interval = 250
     else:
         max_steps = 50_000
-        val_check_interval = 1000
+        val_check_interval = 4_000 # in practice results in one every 1000 with acc grad batches
 
     trainer = Trainer(
         accelerator="gpu",
