@@ -15,6 +15,7 @@ else:
 
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_samples
+from sklearn.preprocessing import StandardScaler
 import umap
 import numpy as np
 
@@ -31,8 +32,11 @@ def raw_to_pca(input_file_raw, output_file_pca):
     obs = inputs["obs"]
     embeds = inputs["embeds"]
 
+    embeds = StandardScaler().fit_transform(embeds)
+
     embeds_pca = PCA(n_components=64).fit_transform(embeds)
     np.savez(output_file_pca, obs=obs, embeds=embeds_pca)
+    print("scores after PCA")
     print(ASWct(embeds_pca, obs[:, ct_col]))
     for b in batch_cols:
         print(ASWbatch(embeds_pca, obs[:, b]))
@@ -45,6 +49,10 @@ def pca_to_umap(input_file_pca, output_file_umap):
     reducer = umap.UMAP(verbose=True, min_dist=0.5)
     embeds_umap = reducer.fit_transform(embeds)
     np.savez(output_file_umap, obs=obs, embeds=embeds_umap)
+    print("scores after UMAP")
+    print(ASWct(embeds_umap, obs[:, ct_col]))
+    for b in batch_cols:
+        print(ASWbatch(embeds_umap, obs[:, b]))
     return obs, embeds_umap
 
 
