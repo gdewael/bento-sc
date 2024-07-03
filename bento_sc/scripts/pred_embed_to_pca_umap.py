@@ -2,8 +2,8 @@ import sys
 input_h5t = str(sys.argv[1])
 input_model_embeds = str(sys.argv[2])
 output_h5ad = str(sys.argv[3])
-ct_col = int(sys.argv[4])
-batch_col = int(sys.argv[5])
+ct_col = str(sys.argv[4])
+batch_col = str(sys.argv[5])
 
 from sklearn.decomposition import PCA
 import numpy as np
@@ -17,7 +17,6 @@ import anndata as ad
 import bbknn
 import scib
 import scanpy as sc
-
 
 f = h5torch.File(input_h5t)
 f = f.to_dict()
@@ -39,8 +38,6 @@ embeds_pca = PCA(n_components=50).fit_transform(adata.obsm["X_emb"])
 adata.obsm["X_pca"] = embeds_pca
 
 bbknn.bbknn(adata, batch_key=batch_col)
-
-sc.pp.neighbors(adata)
 
 sc.tl.umap(adata)
 
