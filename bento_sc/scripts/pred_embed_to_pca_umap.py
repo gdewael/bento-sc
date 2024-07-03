@@ -1,65 +1,65 @@
 import sys
-input_file_raw = str(sys.argv[1])
-input_file_pca = str(sys.argv[2])
-output_file_pca = str(sys.argv[3]) 
-output_file_umap = str(sys.argv[4])
-steps = str(sys.argv[5]) #"pca", "umap", "both"
-ct_col = int(sys.argv[6])
-batch_cols = str(sys.argv[7])
-
-if "," in batch_cols:
-    batch_cols = batch_cols.split(",")
-    batch_cols = [int(b) for b in batch_cols]
-else:
-    batch_cols = [int(batch_cols)]
+input_h5t = str(sys.argv[1])
+input_model_embeds = str(sys.argv[2])
+output_h5ad = str(sys.argv[3])
+ct_col = int(sys.argv[4])
+batch_col = int(sys.argv[5])
 
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_samples
-from sklearn.preprocessing import StandardScaler
-import umap
 import numpy as np
-
-def ASWct(embeddings, celltypes):
-    k = silhouette_samples(embeddings, celltypes)
-    return np.mean((k + 1)/2)
-
-def ASWbatch(embeddings, batch):
-    k = silhouette_samples(embeddings, batch)
-    return np.mean(1 - np.abs(k))
-
-def raw_to_pca(input_file_raw, output_file_pca):
-    inputs = np.load(input_file_raw)
-    obs = inputs["obs"]
-    embeds = inputs["embeds"]
-
-    embeds = StandardScaler().fit_transform(embeds)
-
-    embeds_pca = PCA(n_components=64).fit_transform(embeds)
-    np.savez(output_file_pca, obs=obs, embeds=embeds_pca)
-    print("scores after PCA")
-    print(ASWct(embeds_pca, obs[:, ct_col]))
-    for b in batch_cols:
-        print(ASWbatch(embeds_pca, obs[:, b]))
-    return obs, embeds_pca
-
-def pca_to_umap(input_file_pca, output_file_umap):
-    inputs = np.load(input_file_pca)
-    obs = inputs["obs"]
-    embeds = inputs["embeds"]
-    reducer = umap.UMAP(verbose=True, min_dist=0.5)
-    embeds_umap = reducer.fit_transform(embeds)
-    np.savez(output_file_umap, obs=obs, embeds=embeds_umap)
-    print("scores after UMAP")
-    print(ASWct(embeds_umap, obs[:, ct_col]))
-    for b in batch_cols:
-        print(ASWbatch(embeds_umap, obs[:, b]))
-    return obs, embeds_umap
+from scipy.sparse import csr_matrix
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import h5torch
+import anndata as ad
+import bbknn
+import scib
+import scanpy as sc
 
 
-if steps == "pca":
-    _ = raw_to_pca(input_file_raw, output_file_pca)
-if steps == "umap":
-    _ = pca_to_umap(input_file_pca, output_file_umap)
-if steps == "both":
-    _ = raw_to_pca(input_file_raw, output_file_pca)
-    _ = pca_to_umap(input_file_pca, output_file_umap)
+f = h5torch.File(input_h5t)
+f = f.to_dict()
+
+matrix = csr_matrix((f["central/data"][:],f["central/indices"][:],f["central/indptr"][:]), shape = (f["0/obs"].shape[0], f["1/var"].shape[0]))
+
+adata = ad.AnnData(matrix)
+adata.obs = pd.DataFrame(f["0/obs"], columns=np.arange(f["0/obs"].shape[1]).astype(str))
+adata.var = pd.DataFrame(f["1/var"], columns=np.arange(f["1/var"].shape[1]).astype(str))
+
+adata.obs[batch_col] = adata.obs[batch_col].astype("category")
+adata.obs[ct_col] = adata.obs[ct_col].astype("category")
+
+file = np.load(input_model_embeds)
+adata.obsm["X_emb"] = file["embeds"]
+
+embeds_pca = PCA(n_components=50).fit_transform(adata.obsm["X_emb"])
+
+adata.obsm["X_pca"] = embeds_pca
+
+bbknn.bbknn(adata, batch_key=batch_col)
+
+sc.pp.neighbors(adata)
+
+sc.tl.umap(adata)
+
+clisi, ilisi = scib.me.lisi_graph(adata, batch_key=batch_col, label_key=ct_col, type_="knn", n_cores=16)
+graph_conn = scib.me.graph_connectivity(adata, label_key=ct_col)
+
+scib.cl.cluster_optimal_resolution(adata, cluster_key="iso_label", label_key=ct_col)
+iso_f1 = scib.me.isolated_labels_f1(adata, batch_key=batch_col, label_key=ct_col, embed=None)
+ari = scib.me.ari(adata, cluster_key="iso_label", label_key=ct_col)
+nmi = scib.me.nmi(adata, cluster_key="iso_label", label_key=ct_col)
+
+print("Batch Correction:")
+print("iLISI", ilisi)
+print("GConn", graph_conn)
+
+print("Bio Conservation:")
+print("cLISI", clisi)
+print("ARI__", ari)
+print("NMI__", nmi)
+print("IsoF1", iso_f1)
+
+adata.write(output_h5ad)
