@@ -49,14 +49,13 @@ iso_f1 = scib.me.isolated_labels_f1(adata, batch_key=batch_col, label_key=ct_col
 ari = scib.me.ari(adata, cluster_key="iso_label", label_key=ct_col)
 nmi = scib.me.nmi(adata, cluster_key="iso_label", label_key=ct_col)
 
-print("Batch Correction:")
-print("iLISI", ilisi)
-print("GConn", graph_conn)
-
-print("Bio Conservation:")
-print("cLISI", clisi)
-print("ARI__", ari)
-print("NMI__", nmi)
-print("IsoF1", iso_f1)
+adata.uns["scores"] = {
+    "iLISI" : ilisi,
+    "Graph Connectivity" : graph_conn,
+    "cLISI" : clisi,
+    "ARI" : ari,
+    "NMI" : nmi,
+    "Isolated F1": iso_f1,
+}
 
 adata.write(output_h5ad)
