@@ -74,3 +74,7 @@ def main():
             pearsons.append(pearson_batch_masked(predicted_as_count, true_count).numpy())
 
         print(temp, np.concatenate(pearsons).mean())
+
+
+if __name__ == "__main__":
+    main()
