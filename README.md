@@ -7,6 +7,12 @@ BENchmarking Transformer-Obtained Single-Cell embeddings
 - [ ] fix `process_cxg_subset.py` to use data saved in package name
 - [ ] 
 
+
+To-check
+- [ ] MCV denoising task on cellxgene
+- [ ] Macro spearman on perturb pred (what is the pre-processing of labels there? - do we need 10_000cpm?)
+
+
 ### Baseline list
 - (1) Celltype classification on scTab test set
   - Versus: log reg, small MLP, .. (unpre-trained transformer), pre-trained MLP (cfr scVI)
