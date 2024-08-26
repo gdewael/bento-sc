@@ -4,15 +4,8 @@ BENchmarking Transformer-Obtained Single-Cell embeddings
 
 
 ## Todos
-- [x] Investigate numerical stability of zero truncated loss functions: https://github.com/pytorch/pytorch/blob/main/torch/_refs/nn/functional/__init__.py#L419
-- [x] MCV vs MLM
-- [x] Only non-zero vs random sampling vs only HVGs fixed
-- [x] Implement [CLS-level] tasks:
-  - [x] Molecular CV
-  - [x] Binomial split
-  - [x] Gaussian noise
-  - [x] Supervised celltype labeling
-- [x] Gather some initial baselines
+- [ ] fix `process_cxg_subset.py` to use data saved in package name
+- [ ] 
 
 ### Baseline list
 - (1) Celltype classification on scTab test set
@@ -50,3 +43,13 @@ BENchmarking Transformer-Obtained Single-Cell embeddings
 
 ## Notes on code structure
 All data are loaded in as counts via `h5torch`-compatible HDF5 files. In the Dataset object, the cell measurements are preprocessed using custom class objects, which can be extended with any kind of per-sample preprocessing.
+
+## Trained models
+1. Binned + pred Bin
+2. Norm per count + pred Bin
+3. Norm per cell + pred Bin
+4. Norm per count + logp1 + pred Bin
+5. Norm per cell + logp1 + pred Bin
+6. Count Rank + pred Bin
+7. Count Rank + mask/pred Rank
+8. Count Rank + mask/pred Gene_id
