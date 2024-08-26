@@ -30,7 +30,7 @@ class BinCE(BentoLoss):
     def __init__(self, dim, n_bins, reduction="mean"):
         super().__init__(dim, n_bins, reduction=reduction)
 
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         return self.output_head(x)
 
     def loss(self, inputs, targets):
@@ -48,7 +48,7 @@ class CountMSE(BentoLoss):
         self.exp_output = exp_output
         self.lib_norm = lib_norm
 
-    def predict(self, x, libsize=None):
+    def predict(self, x, libsize=None, **kwargs):
         y = self.output_head(x).squeeze(-1)
         if not self.exp_output:
             return y
@@ -79,7 +79,7 @@ class PoissonNLL(BentoLoss):
         self.lib_norm = lib_norm
         self.zero_trunc = zero_truncated
 
-    def predict(self, x, libsize=None):
+    def predict(self, x, libsize=None,  **kwargs):
         y = self.output_head(x).squeeze(-1)
         if self.lib_norm:
             return F.softmax(y, -1) * libsize
@@ -125,7 +125,7 @@ class NegativeBinomialNLL(BentoLoss):
         self.lib_norm = lib_norm
         self.zero_trunc = zero_truncated
 
-    def predict(self, x, gene_ids=None, libsize=None):
+    def predict(self, x, gene_ids=None, libsize=None, **kwargs):
         y = self.output_head(x)
         if self.fixed_dispersion:
             mus = y.squeeze(-1)
@@ -198,7 +198,7 @@ class ZeroInflatedNegativeBinomialNLL(NegativeBinomialNLL):
 
         self.out_pi = nn.Linear(dim, 1)
 
-    def predict(self, x, gene_ids=None, libsize=None):
+    def predict(self, x, gene_ids=None, libsize=None, **kwargs):
         mus, log_thetas = super().predict(x, gene_ids=gene_ids, libsize=libsize)
         pis = self.out_pi(x).squeeze(-1)
         return mus, log_thetas, pis
@@ -236,7 +236,7 @@ class NCELoss(BentoLoss):
         super().__init__(dim, embed_dim, reduction=reduction)
         self.t = temperature
 
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         return self.output_head(x)
 
     def loss(self, inputs):
@@ -262,7 +262,7 @@ class CellTypeClfLoss(BentoLoss):
     ):
         super().__init__(dim, n_classes, reduction=reduction)
 
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         return self.output_head(x)
 
     def loss(self, inputs, targets):
@@ -281,7 +281,7 @@ class ModalityPredictionLoss(BentoLoss):
     ):
         super().__init__(dim, n_classes, reduction=reduction)
 
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         return self.output_head(x)
 
     def loss(self, inputs, targets):
