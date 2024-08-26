@@ -161,7 +161,15 @@ class BentoTransformer(pl.LightningModule):
     def predict_step(self, batch):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
         y = self(batch)
-        return (batch["0/obs"], y[:, 0])
+        libsizes = batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1)
+
+        count_predictions = self.loss.predict(
+                y[:, 1:], 
+                gene_ids=batch["gene_index"], 
+                libsize=libsizes,
+            )
+
+        return (batch["0/obs"], y[:, 0], count_predictions, batch["gene_counts_true"])
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
@@ -252,7 +260,9 @@ class PerturbTransformer(BentoTransformer):
 
         self.log("val_loss", loss, sync_dist=True)
 
-        y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
+        libsizes = batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1)
+
+        y = self.loss.predict(y[:, 1:], libsize=libsizes)
         
         self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu(), batch["gene_counts_copy"].cpu()))
 
@@ -288,7 +298,9 @@ class PerturbTransformer(BentoTransformer):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y = self(batch)
-        y = self.loss.predict(y[:, 1:], libsize=batch["gene_counts_true"].sum())
+
+        libsizes = batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1)
+        y = self.loss.predict(y[:, 1:], libsize=libsizes)
         return (y, batch["gene_counts_true"], batch["gene_counts_copy"], batch["gene_index"])
     
     @property
