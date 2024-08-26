@@ -5,6 +5,7 @@ import lightning.pytorch as pl
 from bio_attention.attention import TransformerEncoder
 from bio_attention.embed import DiscreteEmbedding, ContinuousEmbedding
 from bento_sc import loss
+from bento_sc.utils.metrics import pearson_batch_masked
 from scipy.stats import spearmanr
 from torchmetrics.classification import MulticlassAccuracy
 import numpy as np
@@ -382,11 +383,8 @@ class CLSTaskTransformer(BentoTransformer):
         all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
 
         if isinstance(self.loss, loss.ModalityPredictionLoss):
-            spearmans = []
-            for i in range(all_preds.shape[1]):
-                s = spearmanr(all_preds[:, i].float().numpy(), all_trues[:, i].float().numpy()).statistic
-                spearmans.append(s)
-            self.log("val_macro_spearman", np.mean(spearmans), sync_dist=True)
+            pearson_per_target = pearson_batch_masked(all_preds.T.float(), all_trues.T.float()).numpy()
+            self.log("val_macro_pearson", np.mean(pearson_per_target), sync_dist=True)
 
         self.validation_step_outputs.clear()
 

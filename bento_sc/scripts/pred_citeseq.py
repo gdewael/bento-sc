@@ -63,8 +63,8 @@ def main():
         model_dict.update(pretrained_dict_new)
         model.load_state_dict(model_dict)
 
-    val_ckpt = ModelCheckpoint(monitor="val_macro_spearman", mode="max")
-    callbacks = [val_ckpt, EarlyStopping(monitor="val_macro_spearman", patience=40, mode="max")]
+    val_ckpt = ModelCheckpoint(monitor="val_macro_pearson", mode="max")
+    callbacks = [val_ckpt, EarlyStopping(monitor="val_macro_pearson", patience=40, mode="max")]
 
     logger = TensorBoardLogger(
         "/".join(args.logs_path.split("/")[:-1]),
