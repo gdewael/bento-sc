@@ -72,8 +72,8 @@ def main():
     )
 
     if args.tune_mode:
-        max_steps = 2_501
-        val_check_interval = 250
+        max_steps = 20_001
+        val_check_interval = 400
     else:
         max_steps = 200_000
         val_check_interval = 2_000

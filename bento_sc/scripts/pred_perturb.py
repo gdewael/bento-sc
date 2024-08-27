@@ -76,11 +76,11 @@ def main():
     )
 
     if args.tune_mode:
-        max_steps = 2_501
-        val_check_interval = 250
+        max_steps = 5_001 # actual steps, so taking into account acc grad
+        val_check_interval = 400 # in practice one in every 100
     else:
-        max_steps = 50_000
-        val_check_interval = 4_000 # in practice results in one every 1000 with acc grad batches
+        max_steps = 50_000 # actual steps, so taking into account acc grad
+        val_check_interval = 2_000 # in practice results in one every 500 with acc grad batches
 
     trainer = Trainer(
         accelerator="gpu",
