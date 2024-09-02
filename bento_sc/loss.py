@@ -36,9 +36,13 @@ class BinCE(BentoLoss):
     def loss(self, inputs, targets):
         return self.reduce(F.cross_entropy(inputs, targets, reduction="none"))
 
-    def forward(self, x, targets, **kwargs):
-        y = self.predict(x)
-        return self.loss(y, targets)
+    def forward(self, x, targets, train_on=None, **kwargs):
+        if train_on is not None:
+            y = self.predict(x)[train_on]
+            return self.loss(y, targets[train_on])
+        else:
+            y = self.predict(x)
+            return self.loss(y, targets)
 
 
 class CountMSE(BentoLoss):
@@ -60,9 +64,12 @@ class CountMSE(BentoLoss):
     def loss(self, inputs, targets):
         return self.reduce(F.mse_loss(inputs, targets, reduction="none"))
 
-    def forward(self, x, targets, **kwargs):
-        y = self.predict(x, libsize=targets.sum())
-        return self.loss(y, targets.to(y.dtype))
+    def forward(self, x, targets, train_on=None, **kwargs):
+        y = self.predict(x, libsize=targets.sum(1)[:, None])
+        if train_on is not None:
+            return self.loss(y[train_on], targets.to(y.dtype)[train_on])
+        else:
+            return self.loss(y, targets.to(y.dtype))
 
 
 class PoissonNLL(BentoLoss):
@@ -81,15 +88,21 @@ class PoissonNLL(BentoLoss):
 
     def predict(self, x, libsize=None,  **kwargs):
         y = self.output_head(x).squeeze(-1)
-        if self.lib_norm:
-            return F.softmax(y, -1) * libsize
+        if self.zero_trunc:
+            if self.lib_norm:
+                return F.softmax(y, -1) * (libsize - y.shape[-1]) + 1
+            else:
+                return y.exp() + 1
         else:
-            return y.exp()
+            if self.lib_norm:
+                return F.softmax(y, -1) * libsize
+            else:
+                return y.exp()
 
     def loss(self, inputs, targets):
         if self.zero_trunc:
             stabilized_term = torch.where(
-                inputs < 10, (inputs.exp() - 1 + 1e-8).log(), inputs
+                inputs < 10, (torch.clamp(inputs,max=10).exp() - 1 + 1e-8).log(), inputs
             )
             loss = stabilized_term - targets * (inputs + 1e-8).log()
         else:
@@ -100,9 +113,12 @@ class PoissonNLL(BentoLoss):
         else:
             return self.reduce(loss + torch.lgamma(targets + 1))
 
-    def forward(self, x, targets, **kwargs):
-        y = self.predict(x, libsize=targets.sum())
-        return self.loss(y, targets)
+    def forward(self, x, targets, train_on=None, **kwargs):
+        y = self.predict(x, libsize=targets.sum(1)[:, None])
+        if train_on is not None:
+            return self.loss(y[train_on], targets[train_on])
+        else:
+            return self.loss(y, targets)
 
 
 class NegativeBinomialNLL(BentoLoss):
@@ -133,10 +149,16 @@ class NegativeBinomialNLL(BentoLoss):
         else:
             mus, log_thetas = y[..., 0], y[..., 1]
 
-        if self.lib_norm:
-            mus = F.softmax(mus, -1) * libsize
+        if self.zero_trunc:
+            if self.lib_norm:
+                mus = F.softmax(mus, -1) * (libsize - mus.shape[-1]) + 1
+            else:
+                mus = mus.exp() + 1
         else:
-            mus = mus.exp()
+            if self.lib_norm:
+                mus = F.softmax(mus, -1) * libsize
+            else:
+                mus = mus.exp()
 
         return mus, log_thetas
 
@@ -147,19 +169,20 @@ class NegativeBinomialNLL(BentoLoss):
         log_thetas += eps
         thetas = log_thetas.exp()
         mus += eps
-
+        
         loss = (
-            torch.lgamma(thetas)
-            - torch.lgamma(targets + thetas)
+            torch.lgamma(thetas.float())
+            - torch.lgamma((targets + thetas).float())
             + targets * (thetas + mus).log()
             - thetas * log_thetas
             - targets * mus.log()
-        )
+        ).to(mus.dtype)
         if self.zero_trunc:
             stabilized_term = torch.where(
-                torch.logical_and(thetas > 10, mus > 10),
+                (thetas + mus) > 15,
                 thetas * (thetas + mus).log(),
-                ((thetas + mus) ** thetas - thetas**thetas).log(),
+                (torch.clamp(thetas + mus, max=15) ** torch.clamp(thetas, max=14) - 
+                 torch.clamp(thetas, max=14)**torch.clamp(thetas, max=14)).log(),
             )
             loss += stabilized_term
         else:
@@ -170,11 +193,15 @@ class NegativeBinomialNLL(BentoLoss):
         else:
             return self.reduce(loss + torch.lgamma(targets + 1))
 
-    def forward(self, x, targets, gene_ids=None):
+    def forward(self, x, targets, gene_ids=None, train_on=None):
         mus, log_thetas = self.predict(
-            self, x, gene_ids=gene_ids, libsize=targets.sum()
+            x, gene_ids=gene_ids, libsize=targets.sum(1)[:, None]
         )
-        return self.loss(mus, log_thetas, targets)
+
+        if train_on is not None:
+            return self.loss(mus[train_on], log_thetas[train_on], targets[train_on])
+        else:
+            return self.loss(mus, log_thetas, targets)
 
 
 class ZeroInflatedNegativeBinomialNLL(NegativeBinomialNLL):

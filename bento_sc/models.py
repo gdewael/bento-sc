@@ -104,19 +104,17 @@ class BentoTransformer(pl.LightningModule):
 
         if not self.config.train_on_all:
             train_on = torch.isnan(batch["gene_counts"])
+        else:
+            train_on = None
 
         y = self(batch)
         
-        if not self.config.train_on_all:
-            loss = self.loss(
-                y[:, 1:][train_on],
-                batch["gene_counts_true"][train_on],
-                gene_ids=batch["gene_index"][train_on]
-            )
-        else:
-            loss = self.loss(
-                y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
-            )
+        loss = self.loss(
+            y[:, 1:],
+            batch["gene_counts_true"],
+            gene_ids=batch["gene_index"],
+            train_on=train_on,
+        )
 
         if self.config.nce_loss:
             nce_loss = self.nce_loss(y[:, 0])
@@ -135,19 +133,17 @@ class BentoTransformer(pl.LightningModule):
 
         if not self.config.train_on_all:
             train_on = torch.isnan(batch["gene_counts"])
+        else:
+            train_on = None
 
         y = self(batch)
-        
-        if not self.config.train_on_all:
-            loss = self.loss(
-                y[:, 1:][train_on],
-                batch["gene_counts_true"][train_on],
-                gene_ids=batch["gene_index"][train_on]
-            )
-        else:
-            loss = self.loss(
-                y[:, 1:], batch["gene_counts_true"], gene_ids=batch["gene_index"]
-            )
+
+        loss = self.loss(
+            y[:, 1:],
+            batch["gene_counts_true"],
+            gene_ids=batch["gene_index"],
+            train_on=train_on,
+        )
 
         if self.config.nce_loss:
             nce_loss = self.nce_loss(y[:, 0])
@@ -162,7 +158,7 @@ class BentoTransformer(pl.LightningModule):
     def predict_step(self, batch):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
         y = self(batch)
-        libsizes = batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1)
+        libsizes = (batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1))[:, None]
 
         count_predictions = self.loss.predict(
                 y[:, 1:], 

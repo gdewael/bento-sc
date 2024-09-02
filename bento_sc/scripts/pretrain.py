@@ -38,7 +38,7 @@ def main():
     parser.add_argument("--data_path", type=str, default=None, help="Data file. Overrides value in config file if specified")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate. Overrides value in config file if specified")
     parser.add_argument("--ckpt_path", type=str, default=None, help="Continue from checkpoint")
-    parser.add_argument("--lr_search_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
+    parser.add_argument("--tune_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
 
     args = parser.parse_args()
 
@@ -67,7 +67,7 @@ def main():
         name=args.logs_path.split("/")[-1],
     )
 
-    if args.lr_search_mode:
+    if args.tune_mode:
         max_steps = 2_501
         val_check_interval = 250
     else:
