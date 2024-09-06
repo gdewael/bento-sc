@@ -38,6 +38,7 @@ class BentoDataModule(LightningDataModule):
             "CountsAsPositions": CountsAsPositions,
             "Copy": Copy,
             "FilterHVG": FilterHVG,
+            "EliminateZeros": EliminateZeros,
         }
 
         if "input_processing" in self.config:
@@ -616,6 +617,29 @@ class CountsAsPositions:
         if not self.skip_trues:
             sample["gene_counts_true"] = gene_index
         return sample
+    
+
+class EliminateZeros:
+    def __init__(
+            self,
+            key="gene_counts",
+            affected_keys=["gene_counts", "gene_index", "gene_counts_true"]
+        ):
+        """
+        Used to make MCV compatible with non-zero transformer input.
+        """
+        self.key = key
+        self.affected_keys = affected_keys
+
+    def __call__(self, sample):
+        assert sample[self.key].ndim == 1
+
+        keep = sample[self.key] != 0
+        
+        for a in self.affected_keys:
+            sample[a] = sample[a][keep]
+
+        return sample
 
 class GaussianResample:
     def __init__(self, key="gene_counts", std=1):
@@ -655,7 +679,7 @@ class Mask:
 
 
 class MolecularCV:
-    def __init__(self, p_to_train=0.8):
+    def __init__(self, p_to_train=0.1):
         self.p = torch.tensor(p_to_train)
 
     def __call__(self, sample):

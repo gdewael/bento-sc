@@ -10,12 +10,24 @@ val_or_test = str(sys.argv[1])
 d = h5torch.Dataset(
     "../data/cellxgene.h5t",
     sample_processor=CellSampleProcessor(
-        SequentialPreprocessor(FilterTopGenes()), return_zeros=False
+        SequentialPreprocessor(), return_zeros=False
     ),
     subset=("0/split", val_or_test))
 
-k = np.random.choice(len(d), size = (100_000, ), replace=False)
-matrix = np.zeros((100_000, 19331), dtype="int32")
+
+seqdepths = []
+for strt, stp in tqdm(zip(
+    d.f["central/indptr"][:][d.indices],
+    d.f["central/indptr"][:][d.indices+1]
+), total=len(d.indices)):
+    seqdepths.append(d.f["central/data"][strt:stp].sum())
+
+k = np.random.choice(
+    np.where(np.array(seqdepths)>25_000)[0],
+    size=(25_000, ),
+    replace=False,
+)
+matrix = np.zeros((25_000, 19331), dtype="int32")
 from scipy.sparse import csr_matrix
 obs_ = []
 for ix, n in tqdm(enumerate(k)):
@@ -55,7 +67,7 @@ f_out.register(
     name="samples",
 )
 
-split = np.full((100_000), "test")
+split = np.full((25_000), "test")
 f_out.register(
     split,
     axis=0,
