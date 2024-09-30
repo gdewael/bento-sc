@@ -59,3 +59,5 @@ All data are loaded in as counts via `h5torch`-compatible HDF5 files. In the Dat
 6. Count Rank + pred Bin
 7. Count Rank + mask/pred Rank
 8. Count Rank + mask/pred Gene_id
+9. Best prev. + Gate input
+10. Best prev. + Pseudoquant input
