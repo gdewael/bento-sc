@@ -15,19 +15,32 @@ To-check
 
 ### Baseline list
 - (1) Celltype classification on scTab test set
-  - Versus: log reg, small MLP, .. (unpre-trained transformer), pre-trained MLP (cfr scVI)
+  - Versus: log reg, small MLP, and the final transformer but then unpre-trained.
 
-- (2) "Zero-shot" Celltype clustering + batch integration on great apes - human dataset (cfr. [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)). 
+- (2) Modality prediction
+  - Versus: log reg, small MLP, and the final transformer but then unpre-trained.
+
+- (3) Perturbation prediction
+  - Versus: Small MLP mixer (linear or not), and the final transformer but then unpre-trained.
+
+- (4) Gene Expr reconstruction
+  - Versus: PCA, VAE
+  - NOTE: in eval. only count for non-zero genes, to obtain comparable measures
+
+- (5) Batch Correction
+  - Versus: VAE trained on CxG, standard preprocessing + PCA (HVG or not)
+
+
+### Miscellaneous dataset details
+- (1) "Zero-shot" Celltype clustering + batch integration on great apes - human dataset (cfr. [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)). 
   - Optionally, gather more datasets
   - For procedure/metrics see [this paper](https://www.biorxiv.org/content/10.1101/2023.10.16.561085v2.full.pdf).
-  - Versus: PCA (on HVG or not), scVI/VAE, scVI trained on CxG
 
 - (2) Modality prediction
   - NeurIPS 2021 Cite-seq ships with a split consisting of a test set from different donor measured at a different site.
   - Training set-up:
     - Standard [CLS] token embedding to predicting the modality
   - Citation: Neurips comp dataset paper and [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)
-  - Versus: log reg, small MLP, .. (unpre-trained transformer)
 
 
 - (3) Perturbation prediction
@@ -41,10 +54,6 @@ To-check
     - Predicted gene exp is always LogP1
     - TODO: Tune embedding uniform init 
   - Citation: GEARS and scGPT.
-  - Versus: Log reg, small MLP, dual encoder network, .. (unpre-trained transformer)
-
- 
-- What about GEX reconstruction?: as this is essentially what we are optimizing for, we exclude this.
 
 
 ## Notes on code structure
