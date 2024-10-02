@@ -34,6 +34,7 @@ def main():
     parser.add_argument("approach", type=str, metavar="approach", help="approach")
     parser.add_argument("logs_path", type=str, metavar="logs_path", help="logs_path")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate. Overrides value in config file if specified")
+    parser.add_argument("--batch_size", type=int, default=None, help="Batch size. Overrides value in config file if specified")
     parser.add_argument("--tune_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
 
     args = parser.parse_args()
@@ -42,6 +43,8 @@ def main():
 
     if args.lr is not None:
         config["lr"] = args.lr
+    if args.batch_size is not None:
+        config["batch_size"] = args.batch_size
     
     dm = BentoDataModule(config)
 
