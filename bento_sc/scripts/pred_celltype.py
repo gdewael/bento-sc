@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--data_path", type=str, default=None, help="Data file. Overrides value in config file if specified")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate. Overrides value in config file if specified")
     parser.add_argument("--batch_size", type=int, default=None, help="Batch size. Overrides value in config file if specified")
+    parser.add_argument("--n_workers", type=int, default=None, help="Num workers. Overrides value in config file if specified")
     parser.add_argument("--transfer_ct_clf_loss", type=boolean, default=False, help="Whether to transfer ct clf loss from pre-trained model.")
     parser.add_argument("--tune_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
 
@@ -49,6 +50,8 @@ def main():
         config["data_path"] = args.data_path
     if args.batch_size is not None:
         config["batch_size"] = args.batch_size
+    if args.n_workers is not None:
+        config["n_workers"] = args.n_workers
 
     dm = BentoDataModule(config)
 
