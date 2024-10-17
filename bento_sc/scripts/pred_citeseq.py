@@ -75,11 +75,11 @@ def main():
     )
 
     if args.tune_mode:
-        max_steps = 20_001
-        val_check_interval = 400
+        max_steps = int(20_000 // (config.batch_size/128)) + 1
+        val_check_interval = int(400 // (config.batch_size/128)**.5)
     else:
-        max_steps = 200_000
-        val_check_interval = 2_000
+        max_steps = int(200_000 // (config.batch_size/128)) + 1
+        val_check_interval = int(2_000 // (config.batch_size/128)**.5)
 
     trainer = Trainer(
         accelerator="gpu",
