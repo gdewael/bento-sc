@@ -189,6 +189,9 @@ class BatchCollater():
             # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
             batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
 
+        if "0/celltype" in batch[0]:
+            batch_collated["0/celltype"] = [b["0/celltype"] for b in batch]
+
         counts_keys = ["gene_index", "gene_counts", "gene_counts_true"]
         append_value = [0, -1, -1]
         if "gene_counts_copy" in batch[0]:

@@ -55,13 +55,16 @@ To-check
     - TODO: Tune embedding uniform init 
   - Citation: GEARS and scGPT.
 
+- (4) GRN inference
+  - `aws s3 cp s3://openproblems-data/resources/grn/grn-benchmark/perturbation_data.h5ad perturbation_data.h5ad --no-sign-request`
+  - `https://raw.githubusercontent.com/aertslab/SCENICprotocol/refs/heads/master/example/allTFs_hg38.txt`
 
 ## Notes on code structure
 All data are loaded in as counts via `h5torch`-compatible HDF5 files. In the Dataset object, the cell measurements are preprocessed using custom class objects, which can be extended with any kind of per-sample preprocessing.
 
 ## Trained models
 1. Binned + pred Bin
-2. Norm per count + pred Bin
+2. Norm per count + pred Bin  
 3. Norm per cell + pred Bin
 4. Norm per count + logp1 + pred Bin
 5. Norm per cell + logp1 + pred Bin
@@ -70,3 +73,11 @@ All data are loaded in as counts via `h5torch`-compatible HDF5 files. In the Dat
 8. Count Rank + mask/pred Gene_id
 9. Best prev. + Gate input
 10. Best prev. + Pseudoquant input
+11. Best prev. + LogP1_MSE loss
+12. Best prev. + LibNorm_LogP1_MSE 
+13. Best prev. + Raw_PoissonNLL loss
+14. Best prev. + LibNorm_PoissonNLL loss
+15. Best prev. + Raw_NBNLL loss
+16. Best prev. + Raw_FixedDisp_NBNLL loss
+17. Best prev. + LibNorm_NLL loss
+18. Best prev. + LibNorm_FixedDisp_NBNLL loss
