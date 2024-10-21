@@ -59,7 +59,7 @@ class CountMSE(BentoLoss):
         elif self.lib_norm:
             return F.softmax(y, -1) * libsize
         else:
-            return y.exp()
+            return torch.clamp(y.exp(), max=1e7)
 
     def loss(self, inputs, targets):
         return self.reduce(F.mse_loss(inputs, targets, reduction="none"))
@@ -92,12 +92,12 @@ class PoissonNLL(BentoLoss):
             if self.lib_norm:
                 return F.softmax(y, -1) * (libsize - y.shape[-1]) + 1
             else:
-                return y.exp() + 1
+                return torch.clamp(y.exp() + 1, max=1e7)
         else:
             if self.lib_norm:
                 return F.softmax(y, -1) * libsize
             else:
-                return y.exp()
+                return torch.clamp(y.exp(), max=1e7)
 
     def loss(self, inputs, targets):
         if self.zero_trunc:
@@ -153,12 +153,12 @@ class NegativeBinomialNLL(BentoLoss):
             if self.lib_norm:
                 mus = F.softmax(mus, -1) * (libsize - mus.shape[-1]) + 1
             else:
-                mus = mus.exp() + 1
+                mus = torch.clamp(mus.exp() + 1, max=1e7)
         else:
             if self.lib_norm:
                 mus = F.softmax(mus, -1) * libsize
             else:
-                mus = mus.exp()
+                mus = torch.clamp(mus.exp(), max=1e7)
 
         return mus, log_thetas
 
