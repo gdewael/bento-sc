@@ -179,10 +179,13 @@ class NegativeBinomialNLL(BentoLoss):
         ).to(mus.dtype)
         if self.zero_trunc:
             stabilized_term = torch.where(
-                (thetas + mus) > 15,
+                torch.logical_or(
+                    (mus-1+1e-8)*(thetas+1e-8) > 15,
+                    mus+thetas>15
+                ),
                 thetas * (thetas + mus).log(),
-                (torch.clamp(thetas + mus, max=15) ** torch.clamp(thetas, max=14) - 
-                 torch.clamp(thetas, max=14)**torch.clamp(thetas, max=14)).log(),
+                (torch.clamp(thetas + mus, max=15) ** torch.clamp(thetas, max=15) - 
+                 torch.clamp(thetas, max=15)**torch.clamp(thetas, max=15) + 1e-8).log(),
             )
             loss += stabilized_term
         else:
