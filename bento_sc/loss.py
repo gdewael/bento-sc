@@ -90,9 +90,9 @@ class PoissonNLL(BentoLoss):
         y = self.output_head(x).squeeze(-1)
         if self.zero_trunc:
             if self.lib_norm:
-                return F.softmax(y, -1) * libsize
+                return F.softmax(y, -1) * (libsize - y.shape[-1]) + 1
             else:
-                return torch.clamp(y.exp(), max=1e7)
+                return torch.clamp(y.exp() + 1, max=1e7)
         else:
             if self.lib_norm:
                 return F.softmax(y, -1) * libsize
