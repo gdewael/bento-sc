@@ -158,13 +158,15 @@ class BentoTransformer(pl.LightningModule):
     def predict_step(self, batch):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
         y = self(batch)
-        libsizes = (batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1))[:, None]
+        libsizes = (batch["gene_counts"].sum(1) + (batch["gene_counts"] == -1).sum(1))[:, None]
 
         count_predictions = self.loss.predict(
                 y[:, 1:], 
                 gene_ids=batch["gene_index"], 
                 libsize=libsizes,
             )
+        if isinstance(count_predictions, tuple):
+            count_predictions = count_predictions[0]
 
         return (batch["0/obs"], y[:, 0], count_predictions, batch["gene_counts_true"])
 
