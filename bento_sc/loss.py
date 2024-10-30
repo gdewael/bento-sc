@@ -46,20 +46,27 @@ class BinCE(BentoLoss):
 
 
 class CountMSE(BentoLoss):
-    def __init__(self, dim, exp_output=True, lib_norm=False, reduction="mean"):
+    def __init__(self, dim, exp_output=True, lib_norm=False, reduction="mean", plus_one=False):
         super().__init__(dim, 1, reduction=reduction)
         assert not (not exp_output and lib_norm), "lib norm true needs exp output True"
         self.exp_output = exp_output
         self.lib_norm = lib_norm
+        self.plus_one = plus_one
 
     def predict(self, x, libsize=None, **kwargs):
         y = self.output_head(x).squeeze(-1)
         if not self.exp_output:
             return y
-        elif self.lib_norm:
-            return F.softmax(y, -1) * libsize
+        if not self.plus_one:
+            if self.lib_norm:
+                return F.softmax(y, -1) * libsize
+            else:
+                return torch.clamp(y.exp(), max=1e7)
         else:
-            return torch.clamp(y.exp(), max=1e7)
+            if self.lib_norm:
+                return F.softmax(y, -1) * (libsize - y.shape[-1]) + 1
+            else:
+                return torch.clamp(y.exp() + 1, max=1e7)
 
     def loss(self, inputs, targets):
         return self.reduce(F.mse_loss(inputs, targets, reduction="none"))
