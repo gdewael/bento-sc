@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--data_path", type=str, default=None, help="Data file. Overrides value in config file if specified")
     parser.add_argument("--clf_output", type=boolean, default=True, help="If the model produced count predictions through multi-class clf.")
     parser.add_argument("--model_preds_logp1", type=boolean, default=False, help="Set to to true if the pre-trained model predicted log transformed counts.")
+    parser.add_argument("--libsize_norm_with_true", type=boolean, default=False, help="Set to to true if libsize norm computation should be done with raw counts.")
 
 
     args = parser.parse_args()
@@ -52,26 +53,40 @@ def main():
     dm.setup(None)
 
 
-    model = BentoTransformer(
-        config
-    )
-    model = model.eval()
+    device_ = "cuda:%s" % config.devices[0]
 
-    trainer = Trainer(
-        accelerator="gpu",
-        devices=config.devices,
-        strategy="auto",
-        plugins=[LightningEnvironment()],
-        logger=False,
-        enable_checkpointing=False,
-        precision="bf16-true",
-        use_distributed_sampler=(True if config.return_zeros else False),
-    )
+    model = BentoTransformer.load_from_checkpoint(args.approach)
+    model = model.to(device_).to(torch.bfloat16).eval()
+    
+    
+    counts = []
+    trues = []
 
-    preds = trainer.predict(model, datamodule=dm, ckpt_path=(None if args.approach == "None" else args.approach))
+    with torch.no_grad():
+        for batch in dm.predict_dataloader():
+            batch["gene_index"] = batch["gene_index"].to(model.device)
+            batch["gene_counts"] = batch["gene_counts"].to(model.device)
+            batch["gene_counts_true"] = batch["gene_counts_true"].to(model.device)
 
-    counts = [p[-2] for p in preds]
-    trues = [p[-1] for p in preds]
+            batch["gene_counts"] = batch["gene_counts"].to(model.dtype)
+            y = model(batch)
+            if args.libsize_norm_with_true:
+                libsizes = (batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1))[:, None]
+            else:
+                libsizes = (batch["gene_counts"].sum(1) + (batch["gene_counts"] == -1).sum(1))[:, None]
+
+            count_predictions = model.loss.predict(
+                    y[:, 1:], 
+                    gene_ids=batch["gene_index"], 
+                    libsize=libsizes,
+                )
+            if isinstance(count_predictions, tuple):
+                count_predictions = count_predictions[0]
+
+
+            counts.append(count_predictions.cpu())
+            trues.append(batch["gene_counts_true"].cpu())
+
 
     if args.clf_output:
         for temp in [0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100]:
