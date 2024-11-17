@@ -61,12 +61,22 @@ class BentoDataModule(LightningDataModule):
         if self.config["in_memory"]:
             f = f.to_dict()
 
+        if ("filter_highseqdepth" in self.config) and (self.config["filter_highseqdepth"] == True):
+            path = files("bento_sc.utils.data").joinpath("cxg_filter.npz")
+            train_indices = np.load(path)["train"]
+            val_indices = np.load(path)["val"]
+            test_indices = np.load(path)["test"]
+        else:
+            train_indices = None
+            val_indices = None
+            test_indices = None
+
         self.train = h5torch.Dataset(
             f,
             sample_processor=processing_class(
                 processor, return_zeros=self.config["return_zeros"]
             ),
-            subset=("0/split", "train"),
+            subset=(train_indices if train_indices is not None else ("0/split", "train")),
         )
 
         self.val = h5torch.Dataset(
@@ -74,7 +84,9 @@ class BentoDataModule(LightningDataModule):
             sample_processor=processing_class(
                 processor, return_zeros=self.config["return_zeros"]
             ),
-            subset=("0/split", ("val_sub" if self.config.val_sub else "val")),
+            subset=(val_indices if val_indices is not None else ("0/split", (
+                "val_sub" if self.config.val_sub else "val"
+                ))),
         )
 
         self.test = h5torch.Dataset(
@@ -82,7 +94,7 @@ class BentoDataModule(LightningDataModule):
             sample_processor=processing_class(
                 processor, return_zeros=self.config["return_zeros"]
             ),
-            subset=("0/split", "test"),
+            subset=(test_indices if test_indices is not None else ("0/split", "test")),
         )
 
     def train_dataloader(self):
