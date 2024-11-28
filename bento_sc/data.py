@@ -662,7 +662,9 @@ class GaussianResample:
         self.std = std
 
     def __call__(self, sample):
-        sample[self.key] = Normal(sample[self.key], self.std).sample()
+        sample[self.key] = torch.maximum(
+            Normal(sample[self.key], self.std).sample(), sample[self.key].min()
+        )
         return sample
 
 
