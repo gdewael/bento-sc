@@ -100,7 +100,10 @@ class BentoTransformer(pl.LightningModule):
         return z
 
     def training_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
 
         if not self.config.train_on_all:
             train_on = torch.isnan(batch["gene_counts"])
@@ -129,7 +132,10 @@ class BentoTransformer(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
 
         if not self.config.train_on_all:
             train_on = torch.isnan(batch["gene_counts"])
@@ -156,7 +162,11 @@ class BentoTransformer(pl.LightningModule):
         self.log("val_loss", loss, sync_dist=True)
 
     def predict_step(self, batch):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
+
         y = self(batch)
         libsizes = (batch["gene_counts"].sum(1) + (batch["gene_counts"] == -1).sum(1))[:, None]
 
@@ -230,7 +240,10 @@ class PerturbTransformer(BentoTransformer):
 
 
     def training_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
 
         y = self(batch)
 
@@ -242,7 +255,10 @@ class PerturbTransformer(BentoTransformer):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
 
         y = self(batch)
 
@@ -286,7 +302,10 @@ class PerturbTransformer(BentoTransformer):
 
 
     def predict_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
 
         y = self(batch)
 
@@ -329,7 +348,10 @@ class CLSTaskTransformer(BentoTransformer):
 
 
     def training_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
 
         y = self(batch)
     
@@ -339,8 +361,11 @@ class CLSTaskTransformer(BentoTransformer):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
-
+        if not self.config.discrete_input:
+            batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+        else:
+            batch["gene_counts"] = batch["gene_counts"].float()
+            
         y = self(batch)
     
         loss = self.loss.loss(y, batch["0/targets"])

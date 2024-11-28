@@ -68,7 +68,11 @@ def main():
             batch["gene_counts"] = batch["gene_counts"].to(model.device)
             batch["gene_counts_true"] = batch["gene_counts_true"].to(model.device)
 
-            batch["gene_counts"] = batch["gene_counts"].to(model.dtype)
+            if not model.config.discrete_input:
+                batch["gene_counts"] = batch["gene_counts"].to(model.dtype)
+            else:
+                batch["gene_counts"] = batch["gene_counts"].float()
+                
             y = model(batch)
             if args.libsize_norm_with_true:
                 libsizes = (batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1))[:, None]

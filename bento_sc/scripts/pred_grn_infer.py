@@ -5,8 +5,8 @@ from bento_sc.utils.metrics import pearson_batch_masked
 from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 import torch
+import pandas as pd
 import numpy as np
-import h5torch
 from importlib.resources import files
 from tqdm import tqdm
 from sklearn.model_selection import GroupKFold
@@ -14,7 +14,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 import argparse
 import h5py
-
 
 def boolean(v):
     if isinstance(v, bool):
@@ -69,8 +68,12 @@ def main():
     key = ("gene_index" if not args.counts_as_pos else "gene_counts")
 
     with torch.no_grad():
-        for batch in dm.test_dataloader():
-            batch["gene_counts"] = batch["gene_counts"].to(model.dtype).to(model.device)
+        for batch in tqdm(dm.test_dataloader(), total=len(dm.test_dataloader())):
+            if not model.config.discrete_input:
+                batch["gene_counts"] = batch["gene_counts"].to(model.dtype).to(model.device)
+            else:
+                batch["gene_counts"] = batch["gene_counts"].float().to(model.device)
+
             batch["gene_index"] = batch["gene_index"].to(model.device)
             y = model(batch).cpu()
 
@@ -83,6 +86,7 @@ def main():
 
     gene_lists_celltype = {}
     top_k_celltype = {}
+    gene_ids_cxg = dm.train.f["1/var"][:, 1]
     for celltype in embeddings_per_gene:
         aggregated_per_cell = {k : torch.stack(v).mean(0) for k, v in embeddings_per_gene[celltype].items() if len(v) > 10}
 
@@ -103,123 +107,128 @@ def main():
         gene_list = torch.where(A.sum(1))[0]
         top_k = gene_list[top_k]
 
-        gene_lists_celltype[celltype] = gene_list
-        top_k_celltype[celltype] = top_k
+        gene_lists_celltype[celltype] = gene_ids_cxg[gene_list.numpy()]
+        top_k_celltype[celltype] = gene_ids_cxg[top_k.numpy()][:, :100]
 
-
-
-    f = h5py.File(args.pertdata_path)
-    gene_ids_pert = f["var"]["_index"][:]
-    gene_ids_cxg = dm.train.f["1/var"][:, 1]
-
-    pert_to_cxg_indices = []
-    for g_id in gene_ids_pert:
-        match = np.where(gene_ids_cxg == g_id)[0]
-        if len(match) > 0:
-            pert_to_cxg_indices.append(match[0])
-        else:
-            pert_to_cxg_indices.append(np.nan)
-    pert_to_cxg_indices = np.array(pert_to_cxg_indices)
-
-    cxg_to_pert_indices = []
-    for g_id in gene_ids_cxg:
-        match = np.where(gene_ids_pert == g_id)[0]
-        if len(match) > 0:
-            cxg_to_pert_indices.append(match[0])
-        else:
-            cxg_to_pert_indices.append(np.nan)
-    cxg_to_pert_indices = np.array(cxg_to_pert_indices)
-
+    
+    motif2gene_db = pd.read_feather(
+        files("bento_sc.utils.data").joinpath("hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather")
+    )
+    motif2tf_db = pd.read_table(
+        files("bento_sc.utils.data").joinpath("motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl")
+    )
 
     path = files("bento_sc.utils.data").joinpath("allTFs_hg38.txt")
     TFs = np.loadtxt(path, dtype="str").astype(bytes)
-    TFs_in_pert_indices = []
-    for ix, g_id in enumerate(gene_ids_pert):
-        match = np.where(TFs == g_id)[0]
-        if len(match) > 0:
-            TFs_in_pert_indices.append(ix)
-        else:
-            TFs_in_pert_indices.append(np.nan)
-    TFs_in_pert_indices = np.array(TFs_in_pert_indices)
 
-    layer = f["layers"]["scgen_pearson"][:]
+    TFs_in_motif2tf = motif2tf_db["gene_name"].values.astype(bytes)
+
+    motif2tf_db = motif2tf_db.iloc[np.isin(TFs_in_motif2tf, TFs)]
+
+    motif2tf_dict = {}
+    for m, tf in zip(motif2tf_db["#motif_id"], motif2tf_db["gene_name"]):
+        if m not in motif2tf_dict:
+            motif2tf_dict[m] = [tf]
+        else:
+            if tf not in motif2tf_dict[m]:
+                motif2tf_dict[m].append(tf)
+
+    ranking = motif2gene_db.iloc[:, :-1].values.argsort(1)[:, ::-1]
+    ranking_top_50 = ranking[:, :50]
+
+    gene_2_tf_dict = {}
+    for motif, genes in zip(motif2gene_db.iloc[:, -1], motif2gene_db.columns[:-1].values[ranking_top_50]):
+        if motif in motif2tf_dict:
+            for gene in genes:
+                if gene not in gene_2_tf_dict:
+                    gene_2_tf_dict[gene] = motif2tf_dict[motif]
+                else:
+                    for tf in motif2tf_dict[motif]:
+                        if tf not in gene_2_tf_dict[gene]:
+                            gene_2_tf_dict[gene].append(tf)
+
+    gene_2_tf_dict_filt = {k : v for k, v in gene_2_tf_dict.items()}
+
+    f = h5py.File(args.pertdata_path)
+    gene_ids_pert = f["var"]["_index"][:]
+    gene_ids_scenic = np.array(list(gene_2_tf_dict_filt)).astype(bytes)
+    tf_ids_scenic = np.array(list((set([t for v in gene_2_tf_dict_filt.values() for t in v])))).astype(bytes)
+
+    possible_gene_ids = np.array(list(set(list(gene_ids_pert)).intersection(gene_ids_scenic)))
+
+    possible_TF_ids = np.array(list(set(list(gene_ids_pert)).intersection(tf_ids_scenic)))
+
+    gene_lists_celltype_filt = {}
+    top_k_celltype_filt = {}
+    for ct in gene_lists_celltype.keys():
+        gene_list_ct = gene_lists_celltype[ct]
+        top_k_ct = top_k_celltype[ct]
+
+        index_select = np.isin(gene_list_ct, possible_gene_ids)
+        gene_lists_celltype_filt[ct] = gene_list_ct[index_select]
+        top_k_celltype_filt[ct] = top_k_ct[index_select]
+
+    dataset = f["layers"]["scgen_pearson"][:]
+
+    dataset_f_select = np.isin(gene_ids_pert, possible_gene_ids)
+    dataset_genes = dataset[:, dataset_f_select]
+    dataset_genes_f = gene_ids_pert[dataset_f_select]
+
+    dataset_f_select = np.isin(gene_ids_pert, possible_TF_ids)
+    dataset_tf = dataset[:, dataset_f_select]
+    dataset_tf_f = gene_ids_pert[dataset_f_select]
 
     score_per_celltype = []
     for celltype in gene_lists_celltype:
         index_of_celltype = np.where(f["obs"]["cell_type"]["categories"][:].astype(str) == celltype)[0][0]
         indices_celltype_in_pertdata = f["obs"]["cell_type"]["codes"][:] == index_of_celltype
-        dataset = layer[indices_celltype_in_pertdata]
+        dataset_genes_celltype = dataset_genes[indices_celltype_in_pertdata]
+        dataset_tf_celltype = dataset_tf[indices_celltype_in_pertdata]
+
+
         groups = f["obs/sm_name/codes"][:][indices_celltype_in_pertdata]
+        train_groups, test_groups = np.split(np.unique(groups), [int(len(np.unique(groups)) * 0.8)])
+        # get the first 1_000 highly variable genes in the pert data which are in the
+        # celltype-spec GRN
+        hvg_ = dataset_genes_f[np.argsort(np.var(dataset_genes_celltype, 0))[::-1]]
+        to_train_on = hvg_[np.where(np.isin(hvg_, gene_lists_celltype_filt[celltype]))[0][:1000]]
 
-        splits = [te for _, te in GroupKFold(n_splits=10).split(dataset, None, groups)]
+        score = []
+        for i in tqdm(range((0 if args.test_mode=="val" else 1), 1000, 2),total=500):
+            selected_gene = to_train_on[i]
 
-        gene_list_ct = gene_lists_celltype[celltype]
-        top_k_ct = top_k_celltype[celltype]
+            index_of_gene = np.where(gene_lists_celltype_filt[celltype] == selected_gene)[0]
 
-        top_k_ct_filtered = top_k_ct[~np.isnan(cxg_to_pert_indices[gene_list_ct])]
-        gene_list_ct_filtered = gene_list_ct[~np.isnan(cxg_to_pert_indices[gene_list_ct])]
+            top_sim_genes_ranked = top_k_celltype_filt[celltype][index_of_gene[0]]
 
-        gene_list_ct_filtered_pert = cxg_to_pert_indices[gene_list_ct_filtered]
-        top_k_ct_filtered_pert = cxg_to_pert_indices[top_k_ct_filtered]
+            tfs_for_that_gene = np.array(gene_2_tf_dict[selected_gene.decode("utf-8")]).astype(bytes)
 
-        hvg_pert_indices = np.argsort(np.var(dataset, 0))[::-1]
-        to_train_on = hvg_pert_indices[np.where(np.isin(hvg_pert_indices, gene_list_ct_filtered_pert))[0][:500]]
 
-        gene_list_to_train_on = gene_list_ct_filtered_pert[np.isin(gene_list_ct_filtered_pert, to_train_on)]
-        top_k_list_to_train_on = top_k_ct_filtered_pert[np.isin(gene_list_ct_filtered_pert, to_train_on)]
-
-        scores_per_gene = []
-        
-        for g, top_k_g in tqdm(zip(
-            gene_list_to_train_on,
-            top_k_list_to_train_on
-        ), total=len(gene_list_to_train_on)):
+            top_sim_tfs_ranked = top_sim_genes_ranked[np.isin(top_sim_genes_ranked, tfs_for_that_gene)]
             
-            top_features_in_pert = top_k_g[~np.isnan(top_k_g)].astype(int)
-            top_features_in_pert_and_TF = TFs_in_pert_indices[top_features_in_pert]
-            top_features_in_pert_and_TF = top_features_in_pert_and_TF[~np.isnan(top_features_in_pert_and_TF)].astype(int)
+            top_sim_tfs_in_pert = top_sim_tfs_ranked[np.isin(top_sim_tfs_ranked, dataset_tf_f)]
 
-            selected_features = top_features_in_pert_and_TF[:5]
+            if len(top_sim_tfs_in_pert) == 0:
+                score.append(0)
+            else:
+                top_sim_tfs_in_pert = top_sim_tfs_in_pert
+                Y = dataset_genes_celltype[:, np.where(dataset_genes_f == selected_gene)[0]]
+                X = dataset_tf_celltype[:, np.isin(dataset_tf_f, top_sim_tfs_in_pert)]
 
-            preds_gene_per_cv = []
-            trues_gene_per_cv = []
-            for i in np.arange(-1, len(splits)-1):
+                X_train = X[np.isin(groups, train_groups)]
+                X_test = X[np.isin(groups, test_groups)]
+                Y_train = Y[np.isin(groups, train_groups)]
+                Y_test = Y[np.isin(groups, test_groups)]
 
-                if args.test_mode == "val":
-                    val = i
-                    test = i+1
-                    train_indices = np.concatenate([s for s, i in zip(splits, ~np.isin(np.arange(len(splits)), [val, test])) if i])
-                    test_indices = splits[val]
+                linreg = LinearRegression().fit(X_train, Y_train)
+                score_ = linreg.score(X_test, Y_test)
+                if score_ < 0:
+                    score.append(0)
+                else:
+                    score.append(score_)
+        score_per_celltype.append(np.mean(score))
+        print(np.mean(score))
 
-                elif args.test_mode == "test":
-                    test = i+1
-                    train_indices = np.concatenate([s for s, i in zip(splits, ~np.isin(np.arange(len(splits)), [test])) if i])
-                    test_indices = splits[test]
-
-                y_train = dataset[train_indices][:, g.astype(int)]
-                y_test = dataset[test_indices][:, g.astype(int)]
-
-                X_train = dataset[train_indices][:, selected_features.astype(int)]
-                X_test = dataset[test_indices][:, selected_features.astype(int)]
-
-
-                linreg = LinearRegression().fit(X_train, y_train)
-
-                preds_gene_per_cv.append(linreg.predict(X_test))
-                trues_gene_per_cv.append(y_test)
-
-            r2_ = r2_score(np.concatenate(trues_gene_per_cv), np.concatenate(preds_gene_per_cv))
-            scores_per_gene.append(r2_)
-
-        print(
-            np.mean(scores_per_gene),
-            np.min(scores_per_gene),
-            np.max(scores_per_gene),
-            np.median(scores_per_gene)
-        )
-
-        score_per_celltype.append(np.mean(scores_per_gene))
-            
     print(np.mean(score_per_celltype))
 
 
