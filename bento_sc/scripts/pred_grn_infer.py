@@ -39,6 +39,7 @@ def main():
     parser.add_argument("config_path", type=str, metavar="config_path", help="config_path")
     parser.add_argument("approach", type=str, metavar="approach", help="approach (model)")
     parser.add_argument("pertdata_path", type=str, help="Path to external validation perturbation data")
+    parser.add_argument("scenic_database", type=str, help="Path to external validation perturbation data")
     parser.add_argument("--data_path", type=str, default=None, help="Data file. Overrides value in config file if specified")
     parser.add_argument("--test_mode", type=str, default="val", help="val or test")
     parser.add_argument("--counts_as_pos", type=boolean, default=False)
@@ -112,7 +113,7 @@ def main():
 
     
     motif2gene_db = pd.read_feather(
-        files("bento_sc.utils.data").joinpath("hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather")
+        args.scenic_database
     )
     motif2tf_db = pd.read_table(
         files("bento_sc.utils.data").joinpath("motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl")
