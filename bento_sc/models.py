@@ -112,12 +112,15 @@ class BentoTransformer(pl.LightningModule):
 
         y = self(batch)
         
-        loss = self.loss(
-            y[:, 1:],
-            batch["gene_counts_true"],
-            gene_ids=batch["gene_index"],
-            train_on=train_on,
-        )
+        if ("no_genewise_loss" in self.config) and (self.config["no_genewise_loss"] == True):
+            loss = 0
+        else:
+            loss = self.loss(
+                y[:, 1:],
+                batch["gene_counts_true"],
+                gene_ids=batch["gene_index"],
+                train_on=train_on,
+            )
 
         if self.config.nce_loss:
             nce_loss = self.nce_loss(y[:, 0])
@@ -144,19 +147,22 @@ class BentoTransformer(pl.LightningModule):
 
         y = self(batch)
 
-        loss = self.loss(
-            y[:, 1:],
-            batch["gene_counts_true"],
-            gene_ids=batch["gene_index"],
-            train_on=train_on,
-        )
+        if ("no_genewise_loss" in self.config) and (self.config["no_genewise_loss"] == True):
+            loss = self.loss(
+                y[:, 1:],
+                batch["gene_counts_true"],
+                gene_ids=batch["gene_index"],
+                train_on=train_on,
+            )
+        else:
+            loss = 0
 
         if self.config.nce_loss:
             nce_loss = self.nce_loss(y[:, 0])
             loss += nce_loss
 
         if self.config.celltype_clf_loss:
-            ct_loss = self.ct_clf_loss(y[:, 0], batch["0/targets"])
+            ct_loss = self.ct_clf_loss(y[:, 0], batch["0/obs"][:, 3])
             loss += ct_loss
 
         self.log("val_loss", loss, sync_dist=True)
