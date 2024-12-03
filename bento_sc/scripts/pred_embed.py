@@ -50,24 +50,31 @@ def main():
         obs = torch.cat(obs).numpy()
 
     else:
-        model = BentoTransformer(
-            config
-        )
+        model = BentoTransformer.load_from_checkpoint(args.approach)
 
-        trainer = Trainer(
-            accelerator="gpu",
-            devices=config.devices,
-            strategy="auto",
-            plugins=[LightningEnvironment()],
-            logger=False,
-            enable_checkpointing=False,
-            precision="bf16-true",
-            use_distributed_sampler=(True if config.return_zeros else False),
-        )
+        device_ = "cuda:%s" % config.devices[0]
+        model = model.to(device_).to(torch.bfloat16).eval()
 
-        preds = trainer.predict(model, datamodule=dm, ckpt_path=(None if args.approach == "None" else args.approach))
-        obs = torch.cat([p[0] for p in preds]).numpy()
-        embeds = torch.cat([p[1] for p in preds]).float().numpy()
+        obs = []
+        embeds = []
+        with torch.no_grad():
+            for batch in dm.predict_dataloader():
+                batch["gene_index"] = batch["gene_index"].to(model.device)
+                batch["gene_counts"] = batch["gene_counts"].to(model.device)
+                batch["gene_counts_true"] = batch["gene_counts_true"].to(model.device)
+
+                if not model.config.discrete_input:
+                    batch["gene_counts"] = batch["gene_counts"].to(model.dtype)
+                else:
+                    batch["gene_counts"] = batch["gene_counts"].float()
+                    
+                y = model(batch)
+
+                embeds.append(y[:, 0].cpu())
+                obs.append(batch["0/obs"])
+
+        embeds = torch.cat(embeds).float().numpy()
+        obs = torch.cat(obs).numpy()
 
 
     np.savez(args.save_path, obs=obs, embeds=embeds)
