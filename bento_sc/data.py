@@ -495,8 +495,9 @@ class DuplicateCells:
         self.affected_keys = affected_keys
 
     def __call__(self, sample):
+        shuffler = torch.randperm(len(sample[self.affected_keys[0]]))
         for a in self.affected_keys:
-            sample[a] = torch.stack([sample[a], sample[a].clone()])
+            sample[a] = torch.stack([sample[a], sample[a].clone()[shuffler]])
         return sample
 
 

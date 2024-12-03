@@ -278,7 +278,7 @@ class NCELoss(BentoLoss):
 
     def loss(self, inputs):
         n = len(inputs)
-        targets = torch.arange(n).view(n // 2, 2).fliplr().view(n)
+        targets = torch.arange(n).view(n // 2, 2).fliplr().view(n).to(inputs.device)
 
         inputs = F.normalize(inputs, dim = -1)
         inputs = (inputs @ inputs.T) / self.t
