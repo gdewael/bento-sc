@@ -526,7 +526,7 @@ class FilterTopGenes:
 
 class FilterHVG:
     def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024, dataset="cellxgene"):
-        assert dataset in ["cellxgene", "citeseq", "greatapes"]
+        assert dataset in ["cellxgene", "citeseq", "greatapes", "embryoniclimb", "circimm"]
         path = files("bento_sc.utils.data").joinpath("hvg_%s.npy" % dataset)
         var = np.load(path)
         asort = np.argsort(var)[::-1][:number]
