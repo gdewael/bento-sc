@@ -73,11 +73,14 @@ def main():
     else:
         max_steps = 200_000
         val_check_interval = 5_000
-
+    if ("no_genewise_loss" in config) and (config["no_genewise_loss"] == True):
+        strategy="ddp_find_unused_parameters_true"
+    else:
+        strategy="auto"
     trainer = Trainer(
         accelerator="gpu",
         devices=config.devices,
-        strategy="auto",
+        strategy=strategy,
         plugins=[LightningEnvironment()],
         gradient_clip_val=1,
         max_steps=max_steps,
