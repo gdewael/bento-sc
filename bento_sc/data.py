@@ -107,6 +107,7 @@ class BentoDataModule(LightningDataModule):
         return torch.utils.data.DataLoader(
             self.train,
             num_workers=self.config.n_workers,
+            prefetch_factor=(None if "prefetch_factor" not in self.config else self.config.prefetch_factor),
             pin_memory=True,
             collate_fn=BatchCollater(self.config.allow_padding),
             batch_sampler = batch_sampler,
@@ -124,6 +125,7 @@ class BentoDataModule(LightningDataModule):
             self.val,
             num_workers=self.config.n_workers,
             pin_memory=True,
+            prefetch_factor=(None if "prefetch_factor" not in self.config else self.config.prefetch_factor),
             collate_fn=BatchCollater(self.config.allow_padding),
             batch_sampler = batch_sampler,
             **extra_kwargs
@@ -138,6 +140,7 @@ class BentoDataModule(LightningDataModule):
             self.test,
             num_workers=self.config.n_workers,
             pin_memory=True,
+            prefetch_factor=(None if "prefetch_factor" not in self.config else self.config.prefetch_factor),
             collate_fn=BatchCollater(True),
             batch_sampler = batch_sampler,
             **extra_kwargs
