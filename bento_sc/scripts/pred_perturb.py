@@ -34,6 +34,7 @@ def main():
     parser.add_argument("logs_path", type=str, metavar="logs_path", help="logs_path")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate. Overrides value in config file if specified")
     parser.add_argument("--init_factor", type=float, default=None, help="init_factor. Overrides value in config file if specified")
+    parser.add_argument("--batch_size", type=int, default=None, help="Batch size. Overrides value in config file if specified")
     parser.add_argument("--tune_mode", type=boolean, default=False, help="Don't pre-train whole model but run small experiment.")
 
 
@@ -45,6 +46,8 @@ def main():
         config["lr"] = args.lr
     if args.init_factor is not None:
         config["perturb_init_factor"] = args.init_factor
+    if args.batch_size is not None:
+        config["batch_size"] = args.batch_size
     
     dm = BentoDataModule(
         config
@@ -76,11 +79,11 @@ def main():
     )
 
     if args.tune_mode:
-        max_steps = 5_001 # actual steps, so taking into account acc grad
-        val_check_interval = 400 # in practice one in every 100
+        max_steps = int(5_000 // (config.batch_size/32)) + 1 # actual steps, so taking into account acc grad
+        val_check_interval = int(400 // (config.batch_size/32)**.5) # in practice one in every 100
     else:
-        max_steps = 50_000 # actual steps, so taking into account acc grad
-        val_check_interval = 2_000 # in practice results in one every 500 with acc grad batches
+        max_steps = int(50_000 // (config.batch_size/32)) + 1 # actual steps, so taking into account acc grad
+        val_check_interval = int(2_000 // (config.batch_size/32)**.5) # in practice results in one every 500 with acc grad batches
 
     trainer = Trainer(
         accelerator="gpu",
