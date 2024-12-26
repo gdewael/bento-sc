@@ -5,7 +5,7 @@ import lightning.pytorch as pl
 from bento_sc.utils.config import Config
 from bento_sc.utils.metrics import pearson_batch_masked
 from bento_sc import loss
-from scipy.stats import spearmanr
+from scipy.stats import pearsonr
 import numpy as np
 from torchmetrics.classification import MulticlassAccuracy
 from copy import deepcopy
@@ -100,32 +100,31 @@ class PerturbBaseline(pl.LightningModule):
 
         self.log("val_loss", loss, sync_dist=True)
 
-        self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu(), batch["gene_counts_copy"].cpu()))
+        self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu(), batch["gene_counts_copy"].cpu(), batch["0/perturbed_gene"].cpu()))
 
     def on_validation_epoch_end(self):     
+        pred_pert_prof = torch.cat([s[0] for s in self.validation_step_outputs])
         true_pert_prof = torch.cat([s[1] for s in self.validation_step_outputs])
-        orig_prof = torch.cat([s[2] for s in self.validation_step_outputs])
+        perturbed_genes = torch.cat([s[3] for s in self.validation_step_outputs])
 
-        if self.config.pred_post_pert:
-            pred_expr_change = torch.cat([s[0] for s in self.validation_step_outputs])
-            pred_pert_prof = pred_expr_change + orig_prof
-        else:
-            pred_pert_prof = torch.cat([s[0] for s in self.validation_step_outputs])
-            pred_expr_change = pred_pert_prof - orig_prof
+        mean_ctrl_profile = torch.cat([s[2] for s in self.validation_step_outputs]).mean(0)
 
-        true_expr_change = true_pert_prof - orig_prof
+        pearsons = []
+        delta_pearsons = []
+        for pert_gene in torch.unique(perturbed_genes):
+            pred_per_pert = pred_pert_prof[perturbed_genes == pert_gene].float().mean(0)
+            true_per_pert = true_pert_prof[perturbed_genes == pert_gene].float().mean(0)
 
-        delta_spearmans = []
-        for i in range(len(true_expr_change)):
-            s = spearmanr(pred_expr_change[i].float().numpy(), true_expr_change[i].float().numpy()).statistic
-            delta_spearmans.append(s)
-        self.log("val_deltaspearman", np.mean(delta_spearmans), sync_dist=True)
+            pred_delta_per_pert = pred_per_pert - mean_ctrl_profile
+            true_delta_per_pert = true_per_pert - mean_ctrl_profile
 
-        spearmans = []
-        for i in range(len(true_expr_change)):
-            s = spearmanr(pred_pert_prof[i].float().numpy(), true_pert_prof[i].float().numpy()).statistic
-            spearmans.append(s)
-        self.log("val_spearman", np.mean(spearmans), sync_dist=True)
+            s1 = pearsonr(pred_per_pert.numpy(), true_per_pert.numpy()).statistic
+            pearsons.append(s1)
+
+            s2 = pearsonr(pred_delta_per_pert.numpy(), true_delta_per_pert.numpy()).statistic
+            delta_pearsons.append(s2)
+        self.log("val_pearson", np.mean(pearsons), sync_dist=True)
+        self.log("val_deltapearson", np.mean(delta_pearsons), sync_dist=True)
 
         self.validation_step_outputs.clear()
 
@@ -133,7 +132,7 @@ class PerturbBaseline(pl.LightningModule):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y = self(batch)
-        return (y, batch["gene_counts_true"], batch["gene_counts_copy"])
+        return (y, batch["gene_counts_true"], batch["gene_counts_copy"], batch["gene_index"])
 
 
     def configure_optimizers(self):
