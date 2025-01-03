@@ -54,7 +54,7 @@ def main():
     if args.n_workers is not None:
         config["n_workers"] = args.n_workers
     if args.prefetch_factor is not None:
-        config["prefetch_factor"] = args.n_workers
+        config["prefetch_factor"] = args.prefetch_factor
 
     dm = BentoDataModule(config)
 
