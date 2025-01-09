@@ -257,3 +257,106 @@ class CLSTaskBaseline(pl.LightningModule):
     @property
     def config_unused(self):
         return set(self.config) - self.config_used
+    
+
+class VAE(pl.LightningModule):
+    def __init__(
+        self,
+        config,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+
+        self.config = deepcopy(config)
+        layers = self.config.vae_layers
+
+        net = []
+        for i in range(len(layers)-1):
+            net.append(nn.Linear(layers[i], layers[i+1]))
+            net.append(nn.Dropout(0.20))
+            net.append(nn.LayerNorm(layers[i+1]))
+            net.append(nn.ReLU())
+        self.encoder = nn.Sequential(*net)
+
+        net = []
+        for i in range(len(layers)-2, 0, -1):
+            net.append(nn.Linear(layers[i+1], layers[i]))
+            net.append(nn.Dropout(0.20))
+            net.append(nn.LayerNorm(layers[i]))
+            net.append(nn.ReLU())
+        net.append(nn.Linear(layers[1], layers[0]))
+
+        self.decoder = nn.Sequential(*net)
+
+        self.to_mu = nn.Linear(layers[-1], layers[-1])
+        self.to_var = nn.Linear(layers[-1], layers[-1])
+        self.beta = self.config.beta
+
+
+        self.lr = float(self.config.lr)
+
+
+    def forward(self, batch):
+        z = self.encoder(batch["gene_counts"])
+        z_means, z_logvars = self.to_mu(z), self.to_var(z)
+
+        z = self.reparameterization(z_means, z_logvars)
+        x_reconstruct = self.decoder(z)
+
+        return x_reconstruct, z_means, z_logvars
+    
+    def reparameterization(self, mean, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mean + eps * std
+    
+    def KL_div(self, means, logvars):
+        KL_div_loss = (-0.5 * torch.sum(1 + logvars - means**2 - logvars.exp())) / means.size(1)
+        return KL_div_loss
+    
+    def poissonNLL(self, inputs, targets):
+        return (inputs - targets * (inputs + 1e-8).log()).mean()
+
+
+    def training_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y, means, logvars = self(batch)
+        pred_counts = torch.clamp(y.exp(), max=1e7)
+
+        recon_loss = self.poissonNLL(pred_counts, batch["gene_counts_true"])
+        kl_div = self.KL_div(means, logvars)
+        loss = (recon_loss + self.beta * kl_div).mean()
+
+        self.log("train_loss", loss , sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        y, means, logvars = self(batch)
+        pred_counts = torch.clamp(y.exp(), max=1e7)
+
+        recon_loss = self.poissonNLL(pred_counts, batch["gene_counts_true"])
+        kl_div = self.KL_div(means, logvars)
+        loss = recon_loss + self.beta * kl_div
+
+        self.log("train_loss", loss , sync_dist=True)
+        return loss
+
+    def predict_step(self, batch):
+        batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
+
+        z = self.encoder(batch["gene_counts"])
+        z_means = self.to_mu(z)
+
+        y = self.decoder(z_means)
+    
+        count_predictions = torch.clamp(y.exp(), max=1e7)
+
+        return (batch["0/obs"], z_means, count_predictions, batch["gene_counts_true"])
+
+
+    def configure_optimizers(self):
+        optimizer = optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
