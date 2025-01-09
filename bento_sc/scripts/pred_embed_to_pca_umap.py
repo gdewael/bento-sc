@@ -5,6 +5,8 @@ os.environ["MKL_NUM_THREADS"] = "4" # export MKL_NUM_THREADS=1
 os.environ["VECLIB_MAXIMUM_THREADS"] = "4" # export VECLIB_MAXIMUM_THREADS=1
 os.environ["NUMEXPR_NUM_THREADS"] = "4" # export NUMEXPR_NUM_THREADS=1
 
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:2048"
+
 
 import sys
 input_h5t = str(sys.argv[1])
@@ -12,6 +14,7 @@ input_model_embeds = str(sys.argv[2])
 output_h5ad = str(sys.argv[3])
 ct_col = str(sys.argv[4])
 batch_col = str(sys.argv[5])
+skip_pca = str(sys.argv[6])
 
 from sklearn.decomposition import PCA
 import numpy as np
@@ -41,7 +44,10 @@ adata.obs[ct_col] = adata.obs[ct_col].astype("category")
 file = np.load(input_model_embeds)
 adata.obsm["X_emb"] = file["embeds"]
 
-embeds_pca = PCA(n_components=50).fit_transform(adata.obsm["X_emb"])
+if skip_pca == "True":
+    embeds_pca = adata.obsm["X_emb"]
+else:
+    embeds_pca = PCA(n_components=50).fit_transform(adata.obsm["X_emb"])
 
 adata.obsm["X_pca"] = embeds_pca
 

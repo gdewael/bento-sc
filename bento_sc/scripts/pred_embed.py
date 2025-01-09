@@ -1,4 +1,9 @@
-
+import os
+os.environ["OMP_NUM_THREADS"] = "4" # export OMP_NUM_THREADS=1
+os.environ["OPENBLAS_NUM_THREADS"] = "4" # export OPENBLAS_NUM_THREADS=1
+os.environ["MKL_NUM_THREADS"] = "4" # export MKL_NUM_THREADS=1
+os.environ["VECLIB_MAXIMUM_THREADS"] = "4" # export VECLIB_MAXIMUM_THREADS=1
+os.environ["NUMEXPR_NUM_THREADS"] = "4" # export NUMEXPR_NUM_THREADS=1
 
 import torch
 import numpy as np
@@ -8,6 +13,7 @@ from lightning.pytorch.plugins.environments import LightningEnvironment
 from lightning.pytorch import Trainer
 from bento_sc.utils.config import Config
 from tqdm import tqdm
+from sklearn.decomposition import IncrementalPCA
 import argparse
 
 
@@ -45,6 +51,23 @@ def main():
         for batch in tqdm(dm.predict_dataloader()):
             embeds.append(batch["gene_counts"])
             obs.append(batch["0/obs"])
+
+        embeds = torch.cat(embeds).numpy()
+        obs = torch.cat(obs).numpy()
+
+    if args.approach == "pca":
+        
+        ipca = IncrementalPCA(n_components=50)
+
+        for batch in tqdm(dm.predict_dataloader()):
+            ipca.partial_fit(batch["gene_counts"])
+
+        embeds = []
+        obs = []
+        for batch in tqdm(dm.predict_dataloader()):
+            embeds.append(ipca.transform(batch["gene_counts"]))
+            obs.append(batch["0/obs"])
+            
 
         embeds = torch.cat(embeds).numpy()
         obs = torch.cat(obs).numpy()
