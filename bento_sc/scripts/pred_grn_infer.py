@@ -14,6 +14,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 import argparse
 import h5py
+import os
 
 def boolean(v):
     if isinstance(v, bool):
@@ -37,12 +38,14 @@ def main():
     )
 
     parser.add_argument("config_path", type=str, metavar="config_path", help="config_path")
-    parser.add_argument("approach", type=str, metavar="approach", help="approach (model)")
+    parser.add_argument("path_to_embeddings", type=str, metavar="path_to_embeddings", help="path_to_embeddings")
     parser.add_argument("pertdata_path", type=str, help="Path to external validation perturbation data")
     parser.add_argument("scenic_database", type=str, help="Path to external validation perturbation data")
     parser.add_argument("--data_path", type=str, default=None, help="Data file. Overrides value in config file if specified")
     parser.add_argument("--test_mode", type=str, default="val", help="val or test")
-    parser.add_argument("--counts_as_pos", type=boolean, default=False)
+    parser.add_argument("--n_features", type=int, default=25, help="val or test")
+    parser.add_argument("--motifs_per_gene", type=int, default=500, help="val or test")
+    parser.add_argument("--n_genes_to_train_on", type=int, default=200, help="val or test")
 
     args = parser.parse_args()
 
@@ -55,46 +58,18 @@ def main():
     )
     dm.setup(None)
 
-    model = BentoTransformer.load_from_checkpoint(args.approach)
-
-    model = model.eval().to(config.devices[0]).to(torch.bfloat16)
-
-    embeddings_per_gene = {
-        "Myeloid cells" : {i : [] for i in range(19331)},
-        "B cells" : {i : [] for i in range(19331)},
-        "NK cells" : {i : [] for i in range(19331)},
-        "T cells" : {i : [] for i in range(19331)},
+    embeddings_per_celltype = {
+        "NK cells" : torch.load(os.path.join(args.path_to_embeddings, "embeddings_NK.pt")),
+        "T cells" : torch.load(os.path.join(args.path_to_embeddings, "embeddings_T.pt")),
+        "B cells" : torch.load(os.path.join(args.path_to_embeddings, "embeddings_B.pt")),
+        "Myeloid cells" : torch.load(os.path.join(args.path_to_embeddings, "embeddings_Myeloid.pt")),
     }
-
-    key = ("gene_index" if not args.counts_as_pos else "gene_counts")
-
-    with torch.no_grad():
-        for batch in tqdm(dm.test_dataloader(), total=len(dm.test_dataloader())):
-            if not model.config.discrete_input:
-                batch["gene_counts"] = batch["gene_counts"].to(model.dtype).to(model.device)
-            else:
-                batch["gene_counts"] = batch["gene_counts"].float().to(model.device)
-
-            batch["gene_index"] = batch["gene_index"].to(model.device)
-            y = model(batch).cpu()
-
-            for sample in range(len(batch["gene_index"])):
-                for gene in range(batch["gene_index"].shape[1]):
-                    if batch["gene_counts"][sample, gene] != -1:
-                        embeddings_per_gene[batch["0/celltype"][sample]][
-                            batch[key][sample, gene].item()
-                        ].append(y[:, 1:][sample, gene].cpu())
 
     gene_lists_celltype = {}
     top_k_celltype = {}
     gene_ids_cxg = dm.train.f["1/var"][:, 1]
-    for celltype in embeddings_per_gene:
-        aggregated_per_cell = {k : torch.stack(v).mean(0) for k, v in embeddings_per_gene[celltype].items() if len(v) > 10}
-
-        embeddings = torch.zeros((19331, 512))
-
-        for k1, v1 in aggregated_per_cell.items():
-            embeddings[k1] = v1
+    for celltype in embeddings_per_celltype:
+        embeddings = embeddings_per_celltype[celltype]
 
         embeddings_norm = embeddings / (embeddings.norm(dim=1)[:, None]+1e-8)
 
@@ -109,7 +84,7 @@ def main():
         top_k = gene_list[top_k]
 
         gene_lists_celltype[celltype] = gene_ids_cxg[gene_list.numpy()]
-        top_k_celltype[celltype] = gene_ids_cxg[top_k.numpy()][:, :100]
+        top_k_celltype[celltype] = gene_ids_cxg[top_k.numpy()]
 
     
     motif2gene_db = pd.read_feather(
@@ -134,19 +109,16 @@ def main():
             if tf not in motif2tf_dict[m]:
                 motif2tf_dict[m].append(tf)
 
-    ranking = motif2gene_db.iloc[:, :-1].values.argsort(1)[:, ::-1]
-    ranking_top_50 = ranking[:, :50]
-
+    normalized = motif2gene_db.iloc[:, :-1].values / (motif2gene_db.iloc[:, :-1].values.mean(1)[:, None]+1e-8)
+    ranking = np.argsort(normalized, axis=0)[::-1][:args.motifs_per_gene]
     gene_2_tf_dict = {}
-    for motif, genes in zip(motif2gene_db.iloc[:, -1], motif2gene_db.columns[:-1].values[ranking_top_50]):
-        if motif in motif2tf_dict:
-            for gene in genes:
-                if gene not in gene_2_tf_dict:
-                    gene_2_tf_dict[gene] = motif2tf_dict[motif]
-                else:
-                    for tf in motif2tf_dict[motif]:
-                        if tf not in gene_2_tf_dict[gene]:
-                            gene_2_tf_dict[gene].append(tf)
+    for gene, rank in zip(motif2gene_db.columns[:-1], ranking.T):
+        motifs_for_gene = motif2gene_db.iloc[:, -1].values[rank]
+        tfs_for_gene = []
+        for motif in motifs_for_gene:
+            if motif in motif2tf_dict:
+                tfs_for_gene += motif2tf_dict[motif]
+        gene_2_tf_dict[gene] = list(np.unique(tfs_for_gene))
 
     gene_2_tf_dict_filt = {k : v for k, v in gene_2_tf_dict.items()}
 
@@ -192,10 +164,10 @@ def main():
         # get the first 1_000 highly variable genes in the pert data which are in the
         # celltype-spec GRN
         hvg_ = dataset_genes_f[np.argsort(np.var(dataset_genes_celltype, 0))[::-1]]
-        to_train_on = hvg_[np.where(np.isin(hvg_, gene_lists_celltype_filt[celltype]))[0][:1000]]
+        to_train_on = hvg_[np.where(np.isin(hvg_, gene_lists_celltype_filt[celltype]))[0][:args.n_genes_to_train_on]]
 
         score = []
-        for i in tqdm(range((0 if args.test_mode=="val" else 1), 1000, 2),total=500):
+        for i in tqdm(range((0 if args.test_mode=="val" else 1), args.n_genes_to_train_on, 2),total=args.n_genes_to_train_on//2):
             selected_gene = to_train_on[i]
 
             index_of_gene = np.where(gene_lists_celltype_filt[celltype] == selected_gene)[0]
@@ -206,8 +178,8 @@ def main():
 
 
             top_sim_tfs_ranked = top_sim_genes_ranked[np.isin(top_sim_genes_ranked, tfs_for_that_gene)]
-            
-            top_sim_tfs_in_pert = top_sim_tfs_ranked[np.isin(top_sim_tfs_ranked, dataset_tf_f)]
+
+            top_sim_tfs_in_pert = top_sim_tfs_ranked[np.isin(top_sim_tfs_ranked, dataset_tf_f)][:args.n_features]
 
             if len(top_sim_tfs_in_pert) == 0:
                 score.append(0)
@@ -228,8 +200,8 @@ def main():
                 else:
                     score.append(score_)
         score_per_celltype.append(np.mean(score))
-        print(np.mean(score))
 
+    print(args.path_to_embeddings)
     print(np.mean(score_per_celltype))
 
 
