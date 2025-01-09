@@ -74,7 +74,9 @@ class BentoDataModule(LightningDataModule):
         self.train = h5torch.Dataset(
             f,
             sample_processor=processing_class(
-                processor, return_zeros=self.config["return_zeros"]
+                processor,
+                return_zeros=self.config["return_zeros"],
+                deterministic=(False if "deterministic" not in self.config else self.config["deterministic"])
             ),
             subset=(train_indices if train_indices is not None else ("0/split", "train")),
         )
@@ -82,7 +84,9 @@ class BentoDataModule(LightningDataModule):
         self.val = h5torch.Dataset(
             f,
             sample_processor=processing_class(
-                processor, return_zeros=self.config["return_zeros"]
+                processor,
+                return_zeros=self.config["return_zeros"],
+                deterministic=(False if "deterministic" not in self.config else self.config["deterministic"])
             ),
             subset=(val_indices if val_indices is not None else ("0/split", (
                 "val_sub" if self.config.val_sub else "val"
@@ -92,7 +96,9 @@ class BentoDataModule(LightningDataModule):
         self.test = h5torch.Dataset(
             f,
             sample_processor=processing_class(
-                processor, return_zeros=self.config["return_zeros"]
+                processor,
+                return_zeros=self.config["return_zeros"],
+                deterministic=(False if "deterministic" not in self.config else self.config["deterministic"])
             ),
             subset=(test_indices if test_indices is not None else ("0/split", "test")),
         )
@@ -339,13 +345,17 @@ class DistributedBucketSampler(DistributedSampler):
         return len_
 
 class CellSampleProcessor:
-    def __init__(self, processor, return_zeros=False, n_genes=19331):
+    def __init__(self, processor, return_zeros=False, n_genes=19331, deterministic=False,):
         self.processor = processor
 
         self.return_zeros = return_zeros
         self.n_genes = n_genes
-
+        self.deterministic = deterministic
     def __call__(self, f, sample):
+
+        if self.deterministic:
+            np.random.seed(42)
+
         if self.return_zeros:
             gene_counts = np.zeros(self.n_genes)
             gene_counts[sample["central"][0]] = sample["central"][1]
@@ -373,7 +383,7 @@ class CellSampleProcessor:
     
 
 class PerturbationCellSampleProcessor:
-    def __init__(self, processor, return_zeros=True, n_genes=19331):
+    def __init__(self, processor, return_zeros=True, n_genes=19331, deterministic=None):
         assert return_zeros == True, "return zeros has to be true for perturbation modeling."
 
         self.processor = processor
