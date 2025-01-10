@@ -339,7 +339,7 @@ class VAE(pl.LightningModule):
 
         recon_loss = self.poissonNLL(pred_counts, batch["gene_counts_true"])
         kl_div = self.KL_div(means, logvars)
-        loss = recon_loss + self.beta * kl_div
+        loss = (recon_loss + self.beta * kl_div).mean()
 
         self.log("train_loss", loss , sync_dist=True)
         return loss

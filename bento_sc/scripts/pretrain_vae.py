@@ -49,7 +49,7 @@ def main():
     if args.lr is not None:
         config["lr"] = args.lr
     if args.beta is not None:
-        config["beta"] = args.lr
+        config["beta"] = args.beta
 
     dm = BentoDataModule(
         config
