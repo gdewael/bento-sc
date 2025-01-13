@@ -314,17 +314,17 @@ class VAE(pl.LightningModule):
         KL_div_loss = (-0.5 * torch.sum(1 + logvars - means**2 - logvars.exp())) / means.size(1)
         return KL_div_loss
     
-    def poissonNLL(self, inputs, targets):
-        return (inputs - targets * (inputs + 1e-8).log()).mean()
+    def MSE(self, inputs, targets):
+        return F.mse_loss(inputs, targets, reduction="none")
 
 
     def training_step(self, batch, batch_idx):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y, means, logvars = self(batch)
-        pred_counts = torch.clamp(y.exp(), max=1e7)
+        pred_counts = y
 
-        recon_loss = self.poissonNLL(pred_counts, batch["gene_counts_true"])
+        recon_loss = self.MSE(pred_counts, batch["gene_counts_true"])
         kl_div = self.KL_div(means, logvars)
         loss = (recon_loss + self.beta * kl_div).mean()
 
@@ -335,13 +335,13 @@ class VAE(pl.LightningModule):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y, means, logvars = self(batch)
-        pred_counts = torch.clamp(y.exp(), max=1e7)
+        pred_counts = y
 
-        recon_loss = self.poissonNLL(pred_counts, batch["gene_counts_true"])
+        recon_loss = self.MSE(pred_counts, batch["gene_counts_true"])
         kl_div = self.KL_div(means, logvars)
         loss = (recon_loss + self.beta * kl_div).mean()
 
-        self.log("train_loss", loss , sync_dist=True)
+        self.log("val_loss", loss , sync_dist=True)
         return loss
 
     def predict_step(self, batch):
