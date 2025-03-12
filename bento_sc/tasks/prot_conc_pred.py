@@ -1,7 +1,6 @@
 from bento_sc.data import BentoDataModule
 from bento_sc.utils.config import Config
 from bento_sc.models import CLSTaskTransformer, BentoTransformer
-from bento_sc.baselines import CLSTaskBaseline
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.plugins.environments import LightningEnvironment

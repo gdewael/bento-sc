@@ -147,5 +147,6 @@ def main():
     res = trainer.validate(model, dm.test_dataloader(), ckpt_path="best")
     print(res)
 
+
 if __name__ == "__main__":
     main()

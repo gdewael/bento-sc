@@ -29,9 +29,6 @@ class CustomFormatter(
     pass
 
 
-
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Script for batch correction evaluation.",
@@ -57,6 +54,7 @@ def main():
         correct_parser = get_correct_parser()
         args = correct_parser.parse_args(sys.argv[2:])
         correct(args)
+
 
 def get_embed_parser():
     parser = argparse.ArgumentParser(
@@ -211,6 +209,7 @@ def correct(args):
     }
     adata.write(args.output_h5ad)
     return None
+
 
 if __name__ == "__main__":
     main()

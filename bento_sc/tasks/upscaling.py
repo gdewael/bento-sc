@@ -2,8 +2,6 @@ from bento_sc.utils.config import Config
 from bento_sc.data import BentoDataModule
 from bento_sc.models import BentoTransformer
 from bento_sc.utils.metrics import pearson_batch_masked
-from lightning.pytorch.plugins.environments import LightningEnvironment
-from lightning.pytorch import Trainer
 import torch
 import numpy as np
 import argparse
