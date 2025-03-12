@@ -21,6 +21,9 @@ Package features:
 - `yaml`-configurable language model training scripts.
 - Modular and extendable data preprocessing pipelines.
 - A diverse set of downstream tasks to evaluate scLM performance.
+- Full reproducibility instructions of our study results via [bento-sc-reproducibility](https://github.com/gdewael/bento-sc-reproducibility).
+
+
 
 ## Install
 
@@ -39,6 +42,8 @@ Please refer to our [documentation page](https://bento-sc.readthedocs.io/en/late
 ## Academic reproducibility
 
 All config files and scripts that were used to pre-train models and fine-tune them towards downstream tasks are included in a separate GitHub repository: [bento-sc-reproducibility](https://github.com/gdewael/bento-sc-reproducibility).
+
+In addition, all scripts to reproduce the "baselines" in our study are located in the [bento-sc-reproducibility](https://github.com/gdewael/bento-sc-reproducibility) repository.
 
 ## Citation
 
