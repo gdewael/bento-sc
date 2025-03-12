@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/bento.svg?raw=true" align="center" width="500" alt="bento-sc">
+<img src="assets/bento.svg?raw=true" align="center" width="450" alt="bento-sc">
 
 <h1></h1>
 
@@ -17,8 +17,8 @@ BENchmarking Transformer-Obtained Single-Cell representations.
 This package contains routines and definitions for pre-training single-cell (transcriptomic) language models.
 
 Package features:
-- Memory-efficient pre-training scRNA-seq dataloading from [`h5torch`-compatible HDF5 files](https://github.com/gdewael/h5torch).
-- `yaml`-configurable training scripts.
+- Memory-efficient scRNA-seq dataloading from [`h5torch`-compatible HDF5 files](https://github.com/gdewael/h5torch).
+- `yaml`-configurable language model training scripts.
 - Modular and extendable data preprocessing pipelines.
 - A diverse set of downstream tasks to evaluate scLM performance.
 
@@ -28,8 +28,7 @@ Package features:
 ```bash
 pip install bento-sc
 ```
-
-The package has been tested with `torch==2.2.2` and `pytorch-lightning==2.2.5`. If you encounter errors using `bento-sc` with more recent version of these two packages, considering downgrading to these listed versions of `torch` and `pytorch-lightning`.
+Note: The package has been tested with `torch==2.2.2` and `pytorch-lightning==2.2.5`. If you encounter errors with `bento-sc` using more recent version of these two packages, consider downgrading.
 
 You may need to [install PyTorch](https://pytorch.org/get-started/locally/) before running this command in order to ensure the right CUDA kernels for your system are installed.
 
@@ -40,3 +39,7 @@ Please refer to our [documentation page](https://bento-sc.readthedocs.io/en/late
 ## Academic reproducibility
 
 All config files and scripts that were used to pre-train models and fine-tune them towards downstream tasks are included in a separate GitHub repository: [bento-sc-reproducibility](https://github.com/gdewael/bento-sc-reproducibility).
+
+## Citation
+
+:eyes: :eyes: :eyes:
