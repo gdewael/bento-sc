@@ -60,12 +60,17 @@ def main():
         ipca = IncrementalPCA(n_components=50)
 
         for batch in tqdm(dm.predict_dataloader()):
-            ipca.partial_fit(batch["gene_counts"])
+            try:
+                ipca.partial_fit(batch["gene_counts"])
+            except:
+                continue
 
         embeds = []
         obs = []
         for batch in tqdm(dm.predict_dataloader()):
-            embeds.append(ipca.transform(batch["gene_counts"]))
+            embeds.append(torch.tensor(
+                ipca.transform(batch["gene_counts"])
+            ))
             obs.append(batch["0/obs"])
             
 
