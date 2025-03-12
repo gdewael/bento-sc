@@ -1,83 +1,42 @@
-# bento-sc
+<div align="center">
 
-BENchmarking Transformer-Obtained Single-Cell embeddings
+<img src="assets/bento.svg?raw=true" align="center" width="500" alt="bento-sc">
 
+<h1></h1>
 
-## Todos
-- [ ] fix `process_cxg_subset.py` to use data saved in package name
-- [ ] 
+BENchmarking Transformer-Obtained Single-Cell representations.
 
+[![PyPi Version](https://img.shields.io/pypi/v/bento-sc.svg)](https://pypi.python.org/pypi/bento-sc/)
+[![GitHub license](https://img.shields.io/github/license/gdewael/bento-sc)](https://github.com/gdewael/bento-sc/blob/main/LICENSE)
+[![Documentation](https://readthedocs.org/projects/bento-sc/badge/?version=latest&style=flat-default)](https://bento-sc.readthedocs.io/en/latest/index.html)
 
-To-check
-- [ ] MCV denoising task on cellxgene
-- [ ] Macro spearman on perturb pred (what is the pre-processing of labels there? - do we need 10_000cpm?)
+</div>
 
+## Single-cell language modeling
 
-### Baseline list
-- (1) Celltype classification on scTab test set
-  - Versus: log reg, small MLP, and the final transformer but then unpre-trained.
+This package contains routines and definitions for pre-training single-cell (transcriptomic) language models.
 
-- (2) Modality prediction
-  - Versus: log reg, small MLP, and the final transformer but then unpre-trained.
+Package features:
+- Memory-efficient pre-training scRNA-seq dataloading from [`h5torch`-compatible HDF5 files](https://github.com/gdewael/h5torch).
+- `yaml`-configurable training scripts.
+- Modular and extendable data preprocessing pipelines.
+- A diverse set of downstream tasks to evaluate scLM performance.
 
-- (3) Perturbation prediction
-  - Versus: Small MLP mixer (linear or not), and the final transformer but then unpre-trained.
+## Install
 
-- (4) Gene Expr reconstruction
-  - Versus: PCA, VAE
-  - NOTE: in eval. only count for non-zero genes, to obtain comparable measures
+`bento-sc` is distribution on PyPI.
+```bash
+pip install bento-sc
+```
 
-- (5) Batch Correction
-  - Versus: VAE trained on CxG, standard preprocessing + PCA (HVG or not)
+The package has been tested with `torch==2.2.2` and `pytorch-lightning==2.2.5`. If you encounter errors using `bento-sc` with more recent version of these two packages, considering downgrading to these listed versions of `torch` and `pytorch-lightning`.
 
+You may need to [install PyTorch](https://pytorch.org/get-started/locally/) before running this command in order to ensure the right CUDA kernels for your system are installed.
 
-### Miscellaneous dataset details
-- (1) "Zero-shot" Celltype clustering + batch integration on great apes - human dataset (cfr. [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)). 
-  - Optionally, gather more datasets
-  - For procedure/metrics see [this paper](https://www.biorxiv.org/content/10.1101/2023.10.16.561085v2.full.pdf).
+## Package structure and usage
 
-- (2) Modality prediction
-  - NeurIPS 2021 Cite-seq ships with a split consisting of a test set from different donor measured at a different site.
-  - Training set-up:
-    - Standard [CLS] token embedding to predicting the modality
-  - Citation: Neurips comp dataset paper and [this paper](https://www.biorxiv.org/content/10.1101/2024.02.16.580624v1.full.pdf)
+Please refer to our [documentation page](https://bento-sc.readthedocs.io/en/latest/index.html).
 
+## Academic reproducibility
 
-- (3) Perturbation prediction
-  - Replogle K562 Essential `"K562_essential_raw_singlecell_01.h5ad"`
-  - Filter genes that are in cellxgene census pre-training set
-  - Filter samples that correspond to perturbations of genes that are observed in both the cellxgene census pre-training set and the fine-tuning set.
-  - Training set-up:
-    - Split random perturbations to val and test set
-    - For these perturbations, use held-out set of control samples (one set for val and test)
-    - For training: randomly pair control samples to perturbed sample
-    - Predicted gene exp is always LogP1
-    - TODO: Tune embedding uniform init 
-  - Citation: GEARS and scGPT.
-
-- (4) GRN inference
-  - `aws s3 cp s3://openproblems-data/resources/grn/grn-benchmark/perturbation_data.h5ad perturbation_data.h5ad --no-sign-request`
-  - `https://raw.githubusercontent.com/aertslab/SCENICprotocol/refs/heads/master/example/allTFs_hg38.txt`
-
-## Notes on code structure
-All data are loaded in as counts via `h5torch`-compatible HDF5 files. In the Dataset object, the cell measurements are preprocessed using custom class objects, which can be extended with any kind of per-sample preprocessing.
-
-## Trained models
-1. Binned + pred Bin
-2. Norm per count + pred Bin  
-3. Norm per cell + pred Bin
-4. Norm per count + logp1 + pred Bin
-5. Norm per cell + logp1 + pred Bin
-6. Count Rank + pred Bin
-7. Count Rank + mask/pred Rank
-8. Count Rank + mask/pred Gene_id
-9. Best prev. + Gate input
-10. Best prev. + Pseudoquant input
-11. Best prev. + LogP1_MSE loss
-12. Best prev. + LibNorm_LogP1_MSE 
-13. Best prev. + Raw_PoissonNLL loss
-14. Best prev. + LibNorm_PoissonNLL loss
-15. Best prev. + Raw_NBNLL loss
-16. Best prev. + Raw_FixedDisp_NBNLL loss
-17. Best prev. + LibNorm_NLL loss
-18. Best prev. + LibNorm_FixedDisp_NBNLL loss
+All config files and scripts that were used to pre-train models and fine-tune them towards downstream tasks are included in a separate GitHub repository: [bento-sc-reproducibility](https://github.com/gdewael/bento-sc-reproducibility).
