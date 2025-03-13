@@ -13,9 +13,10 @@ bento-sc documentation
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-   
-   Getting started <gettings_started.md>
-   Package structure <struct.md>
+
+   Getting started <getting_started.md>
+   Implementing new tasks <implementing_new_benchmarks.md>
+   Implementing new LMs <implementing_new_LM_variants.md>
 
 ..
    Indices and tables
