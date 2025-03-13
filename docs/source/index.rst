@@ -13,6 +13,7 @@ bento-sc documentation
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   
    Getting started <gettings_started.md>
    Package structure <struct.md>
 
