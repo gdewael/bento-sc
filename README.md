@@ -27,7 +27,7 @@ Package features:
 
 ## Install
 
-`bento-sc` is distribution on PyPI.
+`bento-sc` is distributed on PyPI.
 ```bash
 pip install bento-sc
 ```
@@ -35,7 +35,7 @@ Note: The package has been tested with `torch==2.2.2` and `pytorch-lightning==2.
 
 You may need to [install PyTorch](https://pytorch.org/get-started/locally/) before running this command in order to ensure the right CUDA kernels for your system are installed.
 
-## Package structure and usage
+## Package usage and structure 
 
 Please refer to our [documentation page](https://bento-sc.readthedocs.io/en/latest/index.html).
 

@@ -38,11 +38,13 @@ def main():
         metavar="datafile",
         choices=[
             "scTab",
-            "perturb",
+            "scTab_upscaling",
+            "scTab_grn",
             "neurips_citeseq",
             "replogle_perturb",
-            "scTab_upscaling",
-            "sctab_grn",
+            "batchcorr_embryolimb",
+            "batchcorr_greatapes",
+            "batchcorr_circimm",
         ],
         help="Datafile to download, choices: {%(choices)s}",
     )

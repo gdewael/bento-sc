@@ -35,9 +35,9 @@ def main():
     )
 
     parser.add_argument(
-        "config_path", type=str, metavar="config_path", help="config_path"
+        "config_path", type=str, metavar="config_path", help=".yaml config file controlling most of the pre-training parameters."
     )
-    parser.add_argument("logs_path", type=str, metavar="logs_path", help="logs_path")
+    parser.add_argument("logs_path", type=str, metavar="logs_path", help="Where to save tensorboard logs and model weight checkpoints.")
     parser.add_argument(
         "--data_path",
         type=str,
