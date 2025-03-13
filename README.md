@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/bento.svg?raw=true" align="center" width="450" alt="bento-sc">
+<img src="https://raw.githubusercontent.com/gdewael/bento-sc/refs/heads/main/assets/bento.svg" align="center" width="450" alt="bento-sc">
 
 <h1></h1>
 
