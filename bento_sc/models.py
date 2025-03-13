@@ -11,6 +11,7 @@ from torchmetrics.classification import MulticlassAccuracy
 import numpy as np
 from copy import deepcopy
 
+
 class EmbeddingGater(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -20,6 +21,7 @@ class EmbeddingGater(nn.Module):
         y = F.tanh(x) * self.embedding
         y[:, 0, :] = x[:, 0, :]
         return y
+
 
 class EmbeddingPseudoQuantizer(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -33,24 +35,28 @@ class EmbeddingPseudoQuantizer(nn.Module):
 
 
 class BentoTransformer(pl.LightningModule):
-    def __init__(
-        self,
-        config
-    ):
+    def __init__(self, config):
         super().__init__()
         self.save_hyperparameters()
 
         self.config = deepcopy(config)
 
         if self.config.discrete_input:
-            self.embedder = DiscreteEmbedding(self.config.n_discrete_tokens, self.config.dim, cls=True)
+            self.embedder = DiscreteEmbedding(
+                self.config.n_discrete_tokens, self.config.dim, cls=True
+            )
         else:
             self.embedder = ContinuousEmbedding(self.config.dim, cls=True)
 
         if self.config.pseudoquant_input:
-            self.embedder = nn.Sequential(self.embedder, EmbeddingPseudoQuantizer(self.config.dim, self.config.dim))
+            self.embedder = nn.Sequential(
+                self.embedder,
+                EmbeddingPseudoQuantizer(self.config.dim, self.config.dim),
+            )
         elif self.config.gate_input:
-            self.embedder = nn.Sequential(self.embedder, EmbeddingGater(self.config.dim))
+            self.embedder = nn.Sequential(
+                self.embedder, EmbeddingGater(self.config.dim)
+            )
 
         self.transformer = TransformerEncoder(
             depth=self.config.depth,
@@ -59,10 +65,10 @@ class BentoTransformer(pl.LightningModule):
             attentiontype="vanilla",
             attention_args={
                 "dropout": self.config.dropout,
-                "enable_math" : False,
-                "enable_flash" : True,
-                "enable_mem_efficient" : True,
-                },
+                "enable_math": False,
+                "enable_flash": True,
+                "enable_mem_efficient": True,
+            },
             plugintype="learned",
             plugin_args={"dim": self.config.dim, "max_seq_len": self.config.n_genes},
             only_apply_plugin_at_first=True,
@@ -70,7 +76,7 @@ class BentoTransformer(pl.LightningModule):
             glu_ff=True,
             activation="gelu",
         )
-        
+
         loss_mapper = {
             "BinCE": loss.BinCE,
             "CountMSE": loss.CountMSE,
@@ -84,7 +90,9 @@ class BentoTransformer(pl.LightningModule):
         self.loss = loss_mapper[loss_type](self.config.dim, **loss_kwargs)
 
         if self.config.nce_loss:
-            self.nce_loss = loss.NCELoss(self.config.dim, self.config.nce_dim, temperature=self.config.nce_temp)
+            self.nce_loss = loss.NCELoss(
+                self.config.dim, self.config.nce_dim, temperature=self.config.nce_temp
+            )
 
         if self.config.celltype_clf_loss:
             self.ct_clf_loss = loss.CellTypeClfLoss(self.config.dim, 164)
@@ -111,8 +119,10 @@ class BentoTransformer(pl.LightningModule):
             train_on = None
 
         y = self(batch)
-        
-        if ("no_genewise_loss" in self.config) and (self.config["no_genewise_loss"] == True):
+
+        if ("no_genewise_loss" in self.config) and (
+            self.config["no_genewise_loss"] == True
+        ):
             loss = 0
         else:
             loss = self.loss(
@@ -130,8 +140,7 @@ class BentoTransformer(pl.LightningModule):
             ct_loss = self.ct_clf_loss(y[:, 0], batch["0/obs"][:, 3])
             loss += ct_loss
 
-        
-        self.log("train_loss", loss , sync_dist=True)
+        self.log("train_loss", loss, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -147,7 +156,9 @@ class BentoTransformer(pl.LightningModule):
 
         y = self(batch)
 
-        if ("no_genewise_loss" in self.config) and (self.config["no_genewise_loss"] == True):
+        if ("no_genewise_loss" in self.config) and (
+            self.config["no_genewise_loss"] == True
+        ):
             loss = 0
         else:
             loss = self.loss(
@@ -174,13 +185,15 @@ class BentoTransformer(pl.LightningModule):
             batch["gene_counts"] = batch["gene_counts"].float()
 
         y = self(batch)
-        libsizes = (batch["gene_counts"].sum(1) + (batch["gene_counts"] == -1).sum(1))[:, None]
+        libsizes = (batch["gene_counts"].sum(1) + (batch["gene_counts"] == -1).sum(1))[
+            :, None
+        ]
 
         count_predictions = self.loss.predict(
-                y[:, 1:], 
-                gene_ids=batch["gene_index"], 
-                libsize=libsizes,
-            )
+            y[:, 1:],
+            gene_ids=batch["gene_index"],
+            libsize=libsizes,
+        )
         if isinstance(count_predictions, tuple):
             count_predictions = count_predictions[0]
 
@@ -190,7 +203,7 @@ class BentoTransformer(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
 
         return optimizer
-    
+
     @property
     def config_used(self):
         return {
@@ -209,25 +222,24 @@ class BentoTransformer(pl.LightningModule):
             "lr",
             "train_on_all",
         }
-    
+
     @property
     def config_unused(self):
         return set(self.config) - self.config_used
 
 
-
 class PerturbTransformer(BentoTransformer):
-    def __init__(
-        self,
-        config
-    ):
+    def __init__(self, config):
         super().__init__(config)
         assert self.config.nce_loss == False
         assert self.config.celltype_clf_loss == False
         assert self.config.train_on_all == True
         assert isinstance(self.loss, loss.CountMSE)
 
-        self.perturbation_indicator = nn.Parameter(torch.empty(self.config.dim).uniform_(-1, 1)/self.config.perturb_init_factor)
+        self.perturbation_indicator = nn.Parameter(
+            torch.empty(self.config.dim).uniform_(-1, 1)
+            / self.config.perturb_init_factor
+        )
         self.validation_step_outputs = []
 
     def forward(self, batch):
@@ -244,7 +256,6 @@ class PerturbTransformer(BentoTransformer):
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
         return z
 
-
     def training_step(self, batch, batch_idx):
         if not self.config.discrete_input:
             batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
@@ -254,10 +265,12 @@ class PerturbTransformer(BentoTransformer):
         y = self(batch)
 
         loss = self.loss(
-            y[:, 1:], batch["gene_counts_true"].to(y.dtype), gene_ids=batch["gene_index"]
+            y[:, 1:],
+            batch["gene_counts_true"].to(y.dtype),
+            gene_ids=batch["gene_index"],
         )
 
-        self.log("train_loss", loss , sync_dist=True)
+        self.log("train_loss", loss, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -269,23 +282,36 @@ class PerturbTransformer(BentoTransformer):
         y = self(batch)
 
         loss = self.loss(
-            y[:, 1:], batch["gene_counts_true"].to(y.dtype), gene_ids=batch["gene_index"]
+            y[:, 1:],
+            batch["gene_counts_true"].to(y.dtype),
+            gene_ids=batch["gene_index"],
         )
 
         self.log("val_loss", loss, sync_dist=True)
 
-        libsizes = batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1)
+        libsizes = batch["gene_counts_true"].sum(1) + (
+            batch["gene_counts_true"] == -1
+        ).sum(1)
 
         y = self.loss.predict(y[:, 1:], libsize=libsizes)
-        
-        self.validation_step_outputs.append((y.cpu(), batch["gene_counts_true"].cpu(), batch["gene_counts_copy"].cpu(), batch["0/perturbed_gene"].cpu()))
+
+        self.validation_step_outputs.append(
+            (
+                y.cpu(),
+                batch["gene_counts_true"].cpu(),
+                batch["gene_counts_copy"].cpu(),
+                batch["0/perturbed_gene"].cpu(),
+            )
+        )
 
     def on_validation_epoch_end(self):
         pred_pert_prof = torch.cat([s[0] for s in self.validation_step_outputs])
         true_pert_prof = torch.cat([s[1] for s in self.validation_step_outputs])
         perturbed_genes = torch.cat([s[3] for s in self.validation_step_outputs])
 
-        mean_ctrl_profile = torch.cat([s[2] for s in self.validation_step_outputs]).mean(0)
+        mean_ctrl_profile = torch.cat(
+            [s[2] for s in self.validation_step_outputs]
+        ).mean(0)
 
         pearsons = []
         delta_pearsons = []
@@ -299,13 +325,14 @@ class PerturbTransformer(BentoTransformer):
             s1 = pearsonr(pred_per_pert.numpy(), true_per_pert.numpy()).statistic
             pearsons.append(s1)
 
-            s2 = pearsonr(pred_delta_per_pert.numpy(), true_delta_per_pert.numpy()).statistic
+            s2 = pearsonr(
+                pred_delta_per_pert.numpy(), true_delta_per_pert.numpy()
+            ).statistic
             delta_pearsons.append(s2)
         self.log("val_pearson", np.mean(pearsons), sync_dist=True)
         self.log("val_deltapearson", np.mean(delta_pearsons), sync_dist=True)
 
         self.validation_step_outputs.clear()
-
 
     def predict_step(self, batch, batch_idx):
         if not self.config.discrete_input:
@@ -315,34 +342,59 @@ class PerturbTransformer(BentoTransformer):
 
         y = self(batch)
 
-        libsizes = batch["gene_counts_true"].sum(1) + (batch["gene_counts_true"] == -1).sum(1)
+        libsizes = batch["gene_counts_true"].sum(1) + (
+            batch["gene_counts_true"] == -1
+        ).sum(1)
         y = self.loss.predict(y[:, 1:], libsize=libsizes)
-        return (y, batch["gene_counts_true"], batch["gene_counts_copy"], batch["gene_index"])
-    
+        return (
+            y,
+            batch["gene_counts_true"],
+            batch["gene_counts_copy"],
+            batch["gene_index"],
+        )
+
     @property
     def config_used(self):
-        return {"n_discrete_tokens", "dim", "pseudoquant_input", "gate_input", "depth", "dropout", "n_genes", "loss", "lr"}
+        return {
+            "n_discrete_tokens",
+            "dim",
+            "pseudoquant_input",
+            "gate_input",
+            "depth",
+            "dropout",
+            "n_genes",
+            "loss",
+            "lr",
+        }
+
 
 class CLSTaskTransformer(BentoTransformer):
-    def __init__(
-        self,
-        config
-    ):
+    def __init__(self, config):
         super().__init__(config)
         assert self.config.nce_loss == False
-        
+
         if self.config.celltype_clf_loss:
-            self.loss = loss.CellTypeClfLoss(self.config.dim, self.config.cls_finetune_dim)
+            self.loss = loss.CellTypeClfLoss(
+                self.config.dim, self.config.cls_finetune_dim
+            )
         elif self.config.modality_prediction_loss:
-            self.loss = loss.ModalityPredictionLoss(self.config.dim, self.config.cls_finetune_dim)
+            self.loss = loss.ModalityPredictionLoss(
+                self.config.dim, self.config.cls_finetune_dim
+            )
         else:
-            raise ValueError("At least one of celltype clf loss or modality predict loss should be true")
+            raise ValueError(
+                "At least one of celltype clf loss or modality predict loss should be true"
+            )
 
         self.validation_step_outputs = []
 
         if self.config.celltype_clf_loss:
-            self.micro_acc = MulticlassAccuracy(num_classes=self.config.cls_finetune_dim, average="micro")
-            self.macro_acc = MulticlassAccuracy(num_classes=self.config.cls_finetune_dim, average="macro")
+            self.micro_acc = MulticlassAccuracy(
+                num_classes=self.config.cls_finetune_dim, average="micro"
+            )
+            self.macro_acc = MulticlassAccuracy(
+                num_classes=self.config.cls_finetune_dim, average="macro"
+            )
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
@@ -352,7 +404,6 @@ class CLSTaskTransformer(BentoTransformer):
         z = self.transformer(x, pos=batch["gene_index"], mask=mask)
         return self.loss.predict(z[:, 0])
 
-
     def training_step(self, batch, batch_idx):
         if not self.config.discrete_input:
             batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
@@ -360,10 +411,10 @@ class CLSTaskTransformer(BentoTransformer):
             batch["gene_counts"] = batch["gene_counts"].float()
 
         y = self(batch)
-    
+
         loss = self.loss.loss(y, batch["0/targets"])
-        
-        self.log("train_loss", loss , sync_dist=True)
+
+        self.log("train_loss", loss, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -371,9 +422,9 @@ class CLSTaskTransformer(BentoTransformer):
             batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
         else:
             batch["gene_counts"] = batch["gene_counts"].float()
-            
+
         y = self(batch)
-    
+
         loss = self.loss.loss(y, batch["0/targets"])
 
         self.log("val_loss", loss, sync_dist=True)
@@ -404,7 +455,9 @@ class CLSTaskTransformer(BentoTransformer):
         all_trues = torch.cat([s[1] for s in self.validation_step_outputs])
 
         if isinstance(self.loss, loss.ModalityPredictionLoss):
-            pearson_per_target = pearson_batch_masked(all_preds.T.float(), all_trues.T.float()).numpy()
+            pearson_per_target = pearson_batch_masked(
+                all_preds.T.float(), all_trues.T.float()
+            ).numpy()
             self.log("val_macro_pearson", np.mean(pearson_per_target), sync_dist=True)
 
         self.validation_step_outputs.clear()
@@ -422,5 +475,5 @@ class CLSTaskTransformer(BentoTransformer):
             "lr",
             "celltype_clf_loss",
             "modality_prediction_loss",
-            "cls_finetune_dim"
+            "cls_finetune_dim",
         }

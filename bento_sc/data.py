@@ -61,7 +61,9 @@ class BentoDataModule(LightningDataModule):
         if self.config["in_memory"]:
             f = f.to_dict()
 
-        if ("filter_highseqdepth" in self.config) and (self.config["filter_highseqdepth"] == True):
+        if ("filter_highseqdepth" in self.config) and (
+            self.config["filter_highseqdepth"] == True
+        ):
             path = files("bento_sc.utils.data").joinpath("cxg_filter.npz")
             train_indices = np.load(path)["train"]
             val_indices = np.load(path)["val"]
@@ -76,9 +78,15 @@ class BentoDataModule(LightningDataModule):
             sample_processor=processing_class(
                 processor,
                 return_zeros=self.config["return_zeros"],
-                deterministic=(False if "deterministic" not in self.config else self.config["deterministic"])
+                deterministic=(
+                    False
+                    if "deterministic" not in self.config
+                    else self.config["deterministic"]
+                ),
             ),
-            subset=(train_indices if train_indices is not None else ("0/split", "train")),
+            subset=(
+                train_indices if train_indices is not None else ("0/split", "train")
+            ),
         )
 
         self.val = h5torch.Dataset(
@@ -86,11 +94,17 @@ class BentoDataModule(LightningDataModule):
             sample_processor=processing_class(
                 processor,
                 return_zeros=self.config["return_zeros"],
-                deterministic=(False if "deterministic" not in self.config else self.config["deterministic"])
+                deterministic=(
+                    False
+                    if "deterministic" not in self.config
+                    else self.config["deterministic"]
+                ),
             ),
-            subset=(val_indices if val_indices is not None else ("0/split", (
-                "val_sub" if self.config.val_sub else "val"
-                ))),
+            subset=(
+                val_indices
+                if val_indices is not None
+                else ("0/split", ("val_sub" if self.config.val_sub else "val"))
+            ),
         )
 
         self.test = h5torch.Dataset(
@@ -98,69 +112,88 @@ class BentoDataModule(LightningDataModule):
             sample_processor=processing_class(
                 processor,
                 return_zeros=self.config["return_zeros"],
-                deterministic=(False if "deterministic" not in self.config else self.config["deterministic"])
+                deterministic=(
+                    False
+                    if "deterministic" not in self.config
+                    else self.config["deterministic"]
+                ),
             ),
             subset=(test_indices if test_indices is not None else ("0/split", "test")),
         )
 
     def train_dataloader(self):
-        batch_sampler = self.configure_batch_sampler(self.train, n_partitions = 100)
+        batch_sampler = self.configure_batch_sampler(self.train, n_partitions=100)
         if batch_sampler is not None:
             extra_kwargs = {}
         else:
-            extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": True}
-        
+            extra_kwargs = {"batch_size": self.config.batch_size, "shuffle": True}
+
         return torch.utils.data.DataLoader(
             self.train,
             num_workers=self.config.n_workers,
-            prefetch_factor=(None if "prefetch_factor" not in self.config else self.config.prefetch_factor),
+            prefetch_factor=(
+                None
+                if "prefetch_factor" not in self.config
+                else self.config.prefetch_factor
+            ),
             pin_memory=True,
             collate_fn=BatchCollater(self.config.allow_padding),
-            batch_sampler = batch_sampler,
-            **extra_kwargs
+            batch_sampler=batch_sampler,
+            **extra_kwargs,
         )
 
     def val_dataloader(self):
-        batch_sampler = self.configure_batch_sampler(self.val, n_partitions = 1)
+        batch_sampler = self.configure_batch_sampler(self.val, n_partitions=1)
         if batch_sampler is not None:
             extra_kwargs = {}
         else:
-            extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": False}
+            extra_kwargs = {"batch_size": self.config.batch_size, "shuffle": False}
 
         return torch.utils.data.DataLoader(
             self.val,
             num_workers=self.config.n_workers,
             pin_memory=True,
-            prefetch_factor=(None if "prefetch_factor" not in self.config else self.config.prefetch_factor),
+            prefetch_factor=(
+                None
+                if "prefetch_factor" not in self.config
+                else self.config.prefetch_factor
+            ),
             collate_fn=BatchCollater(self.config.allow_padding),
-            batch_sampler = batch_sampler,
-            **extra_kwargs
+            batch_sampler=batch_sampler,
+            **extra_kwargs,
         )
 
     def test_dataloader(self):
         batch_sampler = None
 
-        extra_kwargs = {"batch_size" : self.config.batch_size, "shuffle": False}
+        extra_kwargs = {"batch_size": self.config.batch_size, "shuffle": False}
 
         return torch.utils.data.DataLoader(
             self.test,
             num_workers=self.config.n_workers,
             pin_memory=True,
-            prefetch_factor=(None if "prefetch_factor" not in self.config else self.config.prefetch_factor),
+            prefetch_factor=(
+                None
+                if "prefetch_factor" not in self.config
+                else self.config.prefetch_factor
+            ),
             collate_fn=BatchCollater(True),
-            batch_sampler = batch_sampler,
-            **extra_kwargs
+            batch_sampler=batch_sampler,
+            **extra_kwargs,
         )
-    
+
     def configure_batch_sampler(self, dataset, n_partitions=100):
         if not self.config.return_zeros:
             if (
-                    (isinstance(self.config.devices, list) and len(self.config.devices) > 1) or 
-                    (isinstance(self.config.devices, int) and self.config.devices > 1)
-                ):
-                batch_sampler = DistributedBucketSampler(dataset, self.config.batch_size, n_partitions=n_partitions)
+                isinstance(self.config.devices, list) and len(self.config.devices) > 1
+            ) or (isinstance(self.config.devices, int) and self.config.devices > 1):
+                batch_sampler = DistributedBucketSampler(
+                    dataset, self.config.batch_size, n_partitions=n_partitions
+                )
             else:
-                batch_sampler = BucketBatchSampler(dataset, self.config.batch_size, n_partitions=n_partitions)
+                batch_sampler = BucketBatchSampler(
+                    dataset, self.config.batch_size, n_partitions=n_partitions
+                )
 
         else:
             batch_sampler = None
@@ -168,7 +201,7 @@ class BentoDataModule(LightningDataModule):
 
     def predict_dataloader(self):
         return self.test_dataloader()
-    
+
     @property
     def config_used(self):
         return {
@@ -178,37 +211,44 @@ class BentoDataModule(LightningDataModule):
             "return_zeros",
             "in_memory",
             "n_workers",
-            "batch_size"
-            "devices",
+            "batch_size" "devices",
             "allow_padding",
         }
-    
+
     @property
     def config_unused(self):
         return set(self.config) - self.config_used
 
 
-class BatchCollater():
-    def __init__(self, allow_padding = False):
+class BatchCollater:
+    def __init__(self, allow_padding=False):
         self.allow_padding = allow_padding
-        
+
     def __call__(self, batch):
         batch_collated = {}
-        
+
         batch_collated["0/split"] = [b["0/split"] for b in batch]
 
         if "0/obs" in batch[0]:
-            batch_collated["0/obs"] = torch.tensor(np.array([b["0/obs"] for b in batch]))
+            batch_collated["0/obs"] = torch.tensor(
+                np.array([b["0/obs"] for b in batch])
+            )
 
         if "0/perturbed_gene" in batch[0]:
-            batch_collated["0/perturbed_gene"] = torch.tensor(np.array([b["0/perturbed_gene"] for b in batch])).long()
+            batch_collated["0/perturbed_gene"] = torch.tensor(
+                np.array([b["0/perturbed_gene"] for b in batch])
+            ).long()
 
         if "0/ADT" in batch[0]:
-            batch_collated["0/targets"] = torch.tensor(np.array([b["0/ADT"] for b in batch]))
+            batch_collated["0/targets"] = torch.tensor(
+                np.array([b["0/ADT"] for b in batch])
+            )
         elif ("0/obs" in batch[0]) and (batch[0]["0/obs"].shape[0] == 9):
             # essentially hardcoded to detect the cellxgene pre-training set this way
             # (length 9 obs TODO make more elegant by changing the cellxgene processing script)
-            batch_collated["0/targets"] = torch.tensor(np.array([b["0/obs"][3] for b in batch]))
+            batch_collated["0/targets"] = torch.tensor(
+                np.array([b["0/obs"][3] for b in batch])
+            )
 
         if "0/celltype" in batch[0]:
             batch_collated["0/celltype"] = [b["0/celltype"] for b in batch]
@@ -219,9 +259,7 @@ class BatchCollater():
             counts_keys.append("gene_counts_copy")
             append_value.append(-1)
 
-        for name, padval in zip(
-            counts_keys, append_value
-        ):
+        for name, padval in zip(counts_keys, append_value):
             samples_key = [b[name] for b in batch]
             if not self.allow_padding:
                 samples_key = self.cut_to_uniform_size(samples_key)
@@ -239,23 +277,26 @@ class BatchCollater():
                 else:
                     batch_collated[name] = rearrange(
                         pad_sequence(
-                            [b.T for b in samples_key], batch_first=True, padding_value=padval
+                            [b.T for b in samples_key],
+                            batch_first=True,
+                            padding_value=padval,
                         ),
                         "b l k -> (b k) l",
                     )
 
         if len(batch_collated["gene_index"]) != len(batch_collated["0/split"]):
-            batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"],2))
+            batch_collated["0/split"] = list(np.repeat(batch_collated["0/split"], 2))
             if "0/obs" in batch_collated:
-                batch_collated["0/obs"] = torch.repeat_interleave(batch_collated["0/obs"], 2, dim=0)
-            
+                batch_collated["0/obs"] = torch.repeat_interleave(
+                    batch_collated["0/obs"], 2, dim=0
+                )
+
         return batch_collated
-    
+
     @staticmethod
     def cut_to_uniform_size(list_of_objects):
         min_len = min([b.shape[-1] for b in list_of_objects])
         return [b[..., :min_len] for b in list_of_objects]
-        
 
 
 class BucketBatchSampler(BatchSampler):
@@ -263,15 +304,17 @@ class BucketBatchSampler(BatchSampler):
         self,
         dataset,
         batch_size,
-        n_partitions = 100,
-        indices = None,
+        n_partitions=100,
+        indices=None,
         drop_last=False,
     ):
         super().__init__(dataset, batch_size, drop_last)
 
-        self.len_dataset = (len(dataset) if indices is None else len(indices))
+        self.len_dataset = len(dataset) if indices is None else len(indices)
 
-        self.seqlens = torch.tensor(np.diff(dataset.f["central/indptr"][:])[dataset.indices])
+        self.seqlens = torch.tensor(
+            np.diff(dataset.f["central/indptr"][:])[dataset.indices]
+        )
         if indices is not None:
             self.seqlens = self.seqlens[indices]
             indices = np.array(indices)
@@ -279,9 +322,7 @@ class BucketBatchSampler(BatchSampler):
             indices = np.arange(self.len_dataset)
 
         self.bucket_sampler = BatchSampler(
-            RandomSampler(indices),
-            math.ceil(self.len_dataset / n_partitions),
-            False
+            RandomSampler(indices), math.ceil(self.len_dataset / n_partitions), False
         )
         self.n_partitions = n_partitions
         self.indices = indices
@@ -295,7 +336,9 @@ class BucketBatchSampler(BatchSampler):
             bucket_indices_all.append(bucket_indices_in_order)
 
         for bucket_indices in bucket_indices_all:
-            for batch in SubsetRandomSampler(list(BatchSampler(bucket_indices, self.batch_size, self.drop_last))): #SubsetRandomSampler(list())
+            for batch in SubsetRandomSampler(
+                list(BatchSampler(bucket_indices, self.batch_size, self.drop_last))
+            ):  # SubsetRandomSampler(list())
                 yield batch
 
     def __len__(self):
@@ -304,12 +347,13 @@ class BucketBatchSampler(BatchSampler):
         len_ = sum([math.ceil(tt / self.batch_size) for tt in t])
         return len_
 
+
 class DistributedBucketSampler(DistributedSampler):
     def __init__(
         self,
         dataset,
         batch_size,
-        n_partitions = 100,
+        n_partitions=100,
         num_replicas=None,
         rank=None,
         shuffle=True,
@@ -322,20 +366,20 @@ class DistributedBucketSampler(DistributedSampler):
             rank=rank,
             shuffle=shuffle,
             seed=seed,
-            drop_last=drop_last
+            drop_last=drop_last,
         )
 
         self.batch_size = batch_size
         self.n_partitions = n_partitions
-    
+
     def __iter__(self):
         indices = list(super().__iter__())
         batch_sampler = BucketBatchSampler(
             self.dataset,
             batch_size=self.batch_size,
             n_partitions=self.n_partitions,
-            indices = indices
-            )
+            indices=indices,
+        )
         return iter(batch_sampler)
 
     def __len__(self):
@@ -344,13 +388,21 @@ class DistributedBucketSampler(DistributedSampler):
         len_ = sum([math.ceil(tt / self.batch_size) for tt in t])
         return len_
 
+
 class CellSampleProcessor:
-    def __init__(self, processor, return_zeros=False, n_genes=19331, deterministic=False,):
+    def __init__(
+        self,
+        processor,
+        return_zeros=False,
+        n_genes=19331,
+        deterministic=False,
+    ):
         self.processor = processor
 
         self.return_zeros = return_zeros
         self.n_genes = n_genes
         self.deterministic = deterministic
+
     def __call__(self, f, sample):
 
         if self.deterministic:
@@ -362,7 +414,7 @@ class CellSampleProcessor:
             sample |= {
                 "gene_counts": torch.tensor(gene_counts),
                 "gene_counts_true": torch.tensor(gene_counts),
-                "gene_index" : torch.arange(self.n_genes),
+                "gene_index": torch.arange(self.n_genes),
             }
         else:
             asort = np.argsort(
@@ -380,17 +432,18 @@ class CellSampleProcessor:
         if self.processor is not None:
             sample = self.processor(sample)
         return sample
-    
+
 
 class PerturbationCellSampleProcessor:
     def __init__(self, processor, return_zeros=True, n_genes=19331, deterministic=None):
-        assert return_zeros == True, "return zeros has to be true for perturbation modeling."
+        assert (
+            return_zeros == True
+        ), "return zeros has to be true for perturbation modeling."
 
         self.processor = processor
         self.processor_trues = SequentialPreprocessor(
             CountsPerX(factor=10_000, key="gene_counts_true"),
             LogP1(key="gene_counts_true"),
-
         )
 
         self.processor_origs = SequentialPreprocessor(
@@ -407,10 +460,10 @@ class PerturbationCellSampleProcessor:
         gene_counts = np.zeros(self.n_genes)
         gene_counts[sample["central"][0]] = sample["central"][1]
         sample |= {
-                "gene_counts_true": torch.tensor(gene_counts),
-                "gene_index" : torch.arange(self.n_genes),
-            }
-        
+            "gene_counts_true": torch.tensor(gene_counts),
+            "gene_index": torch.arange(self.n_genes),
+        }
+
         if sample["0/split"] != "train":
             control_sample = sample_csr(f["central"], sample["0/matched_control"])
 
@@ -518,7 +571,7 @@ class FilterTopGenes:
         self,
         number=1024,
         affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
-        key_to_determine_top="gene_counts"
+        key_to_determine_top="gene_counts",
     ):
         self.n = number
         self.affected_keys = affected_keys
@@ -526,23 +579,34 @@ class FilterTopGenes:
 
     def __call__(self, sample):
         if sample[self.affected_keys[0]].ndim == 1:
-            to_select = torch.argsort(sample[self.topkey]).flip(0)[:self.n]
+            to_select = torch.argsort(sample[self.topkey]).flip(0)[: self.n]
             for a in self.affected_keys:
                 sample[a] = sample[a][to_select]
         else:
-            to_select = torch.argsort(sample[self.topkey]).fliplr()[:, :self.n]
+            to_select = torch.argsort(sample[self.topkey]).fliplr()[:, : self.n]
             for a in self.affected_keys:
                 sample[a] = sample[a][torch.arange(2).unsqueeze(-1), to_select]
         return sample
 
 
 class FilterHVG:
-    def __init__(self, affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number = 1024, dataset="cellxgene"):
-        assert dataset in ["cellxgene", "citeseq", "greatapes", "embryoniclimb", "circimm"]
+    def __init__(
+        self,
+        affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
+        number=1024,
+        dataset="cellxgene",
+    ):
+        assert dataset in [
+            "cellxgene",
+            "citeseq",
+            "greatapes",
+            "embryoniclimb",
+            "circimm",
+        ]
         path = files("bento_sc.utils.data").joinpath("hvg_%s.npy" % dataset)
         var = np.load(path)
         asort = np.argsort(var)[::-1][:number]
-        self.to_select = torch.sort(torch.tensor(asort.copy())).values 
+        self.to_select = torch.sort(torch.tensor(asort.copy())).values
         self.affected_keys = affected_keys
 
     def __call__(self, sample):
@@ -566,14 +630,17 @@ class FilterRandomGenes:
         self,
         number=1024,
         affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
-        proportional_hvg = False,
+        proportional_hvg=False,
     ):
         self.n = number
         self.affected_keys = affected_keys
         if proportional_hvg:
             path = files("bento_sc.utils.data").joinpath("hvg_cellxgene.npy")
             var = np.load(path)
-            self.p = np.exp(np.log10(var+1e-8)/5)/np.exp(np.log10(var+1e-8)/5).sum()
+            self.p = (
+                np.exp(np.log10(var + 1e-8) / 5)
+                / np.exp(np.log10(var + 1e-8) / 5).sum()
+            )
         self.proportional_hvg = proportional_hvg
 
     def __call__(self, sample):
@@ -593,13 +660,17 @@ class FilterRandomGenes:
             for a in self.affected_keys:
                 sample[a] = sample[a][torch.arange(2).unsqueeze(-1), indices]
         return sample
-    
+
     def _sample(self, sample, len_):
         if not self.proportional_hvg:
             return torch.randperm(len_)[: self.n]
         else:
-            assert len_ == 19331, "proportional hvg sampling can only be done on all genes"
-            to_sample_gene_ix = torch.tensor(np.random.choice(len_, size=(self.n, ), p=self.p), replace=False)
+            assert (
+                len_ == 19331
+            ), "proportional hvg sampling can only be done on all genes"
+            to_sample_gene_ix = torch.tensor(
+                np.random.choice(len_, size=(self.n,), p=self.p), replace=False
+            )
             return torch.argsort(sample["gene_index"])[to_sample_gene_ix]
 
 
@@ -614,7 +685,8 @@ class PoissonResample:
             resampled = torch.clamp(resampled, min=1)
         sample[self.key] = resampled
         return sample
-    
+
+
 class Copy:
     def __init__(self, key="gene_counts", to="gene_counts_copy"):
         self.key = key
@@ -623,9 +695,13 @@ class Copy:
     def __call__(self, sample):
         sample[self.to] = sample[self.key].clone()
         return sample
-    
+
+
 class CountsAsPositions:
-    def __init__(self, skip_trues=False,):
+    def __init__(
+        self,
+        skip_trues=False,
+    ):
         """
         Used for Geneformer-style pre-training:
             - Gene index: RankCounts Gene counts
@@ -645,14 +721,14 @@ class CountsAsPositions:
         if not self.skip_trues:
             sample["gene_counts_true"] = gene_index
         return sample
-    
+
 
 class EliminateZeros:
     def __init__(
-            self,
-            key="gene_counts",
-            affected_keys=["gene_counts", "gene_index", "gene_counts_true"]
-        ):
+        self,
+        key="gene_counts",
+        affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
+    ):
         """
         Used to make MCV compatible with non-zero transformer input.
         """
@@ -663,11 +739,12 @@ class EliminateZeros:
         assert sample[self.key].ndim == 1
 
         keep = sample[self.key] != 0
-        
+
         for a in self.affected_keys:
             sample[a] = sample[a][keep]
 
         return sample
+
 
 class GaussianResample:
     def __init__(self, key="gene_counts", std=1):

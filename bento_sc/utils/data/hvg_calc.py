@@ -6,7 +6,9 @@ import torch
 
 train = h5torch.Dataset(
     "../data/circ_imm.h5t",
-    sample_processor=CellSampleProcessor(SequentialPreprocessor(*[]), return_zeros=True),
+    sample_processor=CellSampleProcessor(
+        SequentialPreprocessor(*[]), return_zeros=True
+    ),
     in_memory=False,
     subset=("0/split", "test"),
 )
@@ -25,7 +27,6 @@ for i in range(19331):
     dict_keeper.append(dict())
 
 
-
 for batch in tqdm(dataloader):
     for i in range(19331):
         s, c = torch.unique(batch["gene_counts"][:, i], return_counts=True)
@@ -40,19 +41,21 @@ def mu(gene_c):
     total = 0
     running_sum = 0
     for k, v in gene_c.items():
-        running_sum += k*v
+        running_sum += k * v
         total += v
 
     return running_sum / total
+
 
 def var(gene_c, mu):
     total = 0
     running_sum = 0
     for k, v in gene_c.items():
-        running_sum += ((k - mu)**2)*v
+        running_sum += ((k - mu) ** 2) * v
         total += v
 
     return running_sum / total
+
 
 mus = []
 vars = []
@@ -78,10 +81,11 @@ def safe_var(gene_c, mu, reg_var):
     total = sum(list(gene_c.values()))
     running_sum = 0
     for k, v in gene_c.items():
-        val = (k - mu)/reg_var
-        running_sum += (np.minimum(val, total**.5)**2)*v
+        val = (k - mu) / reg_var
+        running_sum += (np.minimum(val, total**0.5) ** 2) * v
 
     return running_sum / (total - 1)
+
 
 final_var = np.zeros(19331)
 for ix, i in enumerate(np.where(not_const)[0]):

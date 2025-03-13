@@ -19,6 +19,7 @@ import shutil
 import h5torch
 from bento_sc.data import CellSampleProcessor, SequentialPreprocessor, FilterTopGenes
 
+
 class CustomFormatter(
     argparse.ArgumentDefaultsHelpFormatter, argparse.MetavarTypeHelpFormatter
 ):
@@ -35,7 +36,14 @@ def main():
         "datafile",
         type=str,
         metavar="datafile",
-        choices=["scTab", "perturb", "neurips_citeseq", "replogle_perturb", "scTab_upscaling", "sctab_grn"],
+        choices=[
+            "scTab",
+            "perturb",
+            "neurips_citeseq",
+            "replogle_perturb",
+            "scTab_upscaling",
+            "sctab_grn",
+        ],
         help="Datafile to download, choices: {%(choices)s}",
     )
 
@@ -77,6 +85,7 @@ def get_sctab_parser():
     )
     return parser
 
+
 def get_sctab_upsc_parser():
     parser = argparse.ArgumentParser(
         description="Subset scTab for gene upscaling task (select deeply sequenced cells).",
@@ -103,6 +112,7 @@ def get_sctab_upsc_parser():
     )
     return parser
 
+
 def get_sctab_grn_parser():
     parser = argparse.ArgumentParser(
         description="Subset scTab for GRN inference task (i.e. select 2~500 cells from 4 celltypes in a given data split).",
@@ -128,6 +138,7 @@ def get_sctab_grn_parser():
         help="Data split to subset. Choices: {%(choices)s}",
     )
     return parser
+
 
 def get_citeseq_parser():
     parser = argparse.ArgumentParser(
@@ -557,23 +568,30 @@ def get_sctab(args):
     f_out.close()
     return None
 
+
 def get_sctab_upsc(args):
     d = h5torch.Dataset(
         args.sctab_h5t,
         sample_processor=CellSampleProcessor(
             SequentialPreprocessor(), return_zeros=False
         ),
-        subset=("0/split", args.val_or_test)
+        subset=("0/split", args.val_or_test),
     )
-    k = np.load(files("bento_sc.utils.data").joinpath("cxg_upsc_%s_subset.npy" % args.val_or_test))
+    k = np.load(
+        files("bento_sc.utils.data").joinpath(
+            "cxg_upsc_%s_subset.npy" % args.val_or_test
+        )
+    )
 
     matrix = np.zeros((25_000, 19331), dtype="int32")
     from scipy.sparse import csr_matrix
+
     obs_ = []
     for ix, n in tqdm(enumerate(k)):
-        matrix[ix, d[n]["gene_index"].numpy()] = d[n]["gene_counts"].numpy().astype(np.int32)
+        matrix[ix, d[n]["gene_index"].numpy()] = (
+            d[n]["gene_counts"].numpy().astype(np.int32)
+        )
         obs_.append(d[n]["0/obs"])
-
 
     obs = np.stack(obs_)
     f_out = h5torch.File(args.output_file_path, "w")
@@ -583,15 +601,9 @@ def get_sctab_upsc(args):
         mode="csr",
         dtype_save="float32",
         dtype_load="float32",
-        csr_load_sparse=True
+        csr_load_sparse=True,
     )
-    f_out.register(
-        obs,
-        axis=0,
-        name="obs",
-        dtype_save="int64",
-        dtype_load="int64"
-    )
+    f_out.register(obs, axis=0, name="obs", dtype_save="int64", dtype_load="int64")
 
     f_out.register(
         d.f["1/var"][:],
@@ -608,16 +620,11 @@ def get_sctab_upsc(args):
     )
 
     split = np.full((25_000), "test")
-    f_out.register(
-        split,
-        axis=0,
-        name="split",
-        dtype_save="bytes",
-        dtype_load="str"
-    )
+    f_out.register(split, axis=0, name="split", dtype_save="bytes", dtype_load="str")
 
     f_out.close()
     return None
+
 
 def get_sctab_grn(args):
     url = "https://github.com/obophenotype/cell-ontology/releases/download/v2023-05-22/cl-simple.obo"
@@ -638,7 +645,8 @@ def get_sctab_grn(args):
 
     def find_child_nodes(cell_type):
         return [
-            id_to_name[node] for node in networkx.ancestors(graph, name_to_id[cell_type])
+            id_to_name[node]
+            for node in networkx.ancestors(graph, name_to_id[cell_type])
         ]
 
     myeloid_cells = ["myeloid cell"] + find_child_nodes("myeloid cell")
@@ -651,15 +659,20 @@ def get_sctab_grn(args):
 
     celltypes_indices = []
     for celltype_to_select in [myeloid_cells, B_cells, NK_cells, T_cells]:
-        indices_celltype = np.where(np.isin(ct_cxg, np.array([ct for ct in celltype_to_select if ct in ct_cxg])))[0]
+        indices_celltype = np.where(
+            np.isin(ct_cxg, np.array([ct for ct in celltype_to_select if ct in ct_cxg]))
+        )[0]
         celltypes_indices.append(np.isin(f_cxg["0/obs"][:, 3], indices_celltype))
 
-    blood_cells = (f_cxg["0/obs"][:, 7] == np.where(f_cxg["unstructured"]["7_tissue_general"][:] == b"blood")[0][0])
+    blood_cells = (
+        f_cxg["0/obs"][:, 7]
+        == np.where(f_cxg["unstructured"]["7_tissue_general"][:] == b"blood")[0][0]
+    )
     celltype_indices_blood = []
     for celltype_ind in celltypes_indices:
         celltype_indices_blood.append(np.logical_and(celltype_ind, blood_cells))
 
-    frac = f_cxg["0/split"][:] == bytes(args.val_or_test, 'utf-8')
+    frac = f_cxg["0/split"][:] == bytes(args.val_or_test, "utf-8")
     celltype_indices_blood_frac = []
     for celltype_ind in celltype_indices_blood:
         celltype_indices_blood_frac.append(np.logical_and(celltype_ind, frac))
@@ -667,30 +680,40 @@ def get_sctab_grn(args):
     matrix = np.zeros((10_000, 19331), dtype="int32")
     obs_ = []
 
-    subsets = np.load(files("bento_sc.utils.data").joinpath("cxg_grn_%s_subset.npy" % args.val_or_test))
+    subsets = np.load(
+        files("bento_sc.utils.data").joinpath(
+            "cxg_grn_%s_subset.npy" % args.val_or_test
+        )
+    )
 
     c = 0
-    for subset, ct_ind in zip(np.split(subsets,4), celltype_indices_blood_frac):
+    for subset, ct_ind in zip(np.split(subsets, 4), celltype_indices_blood_frac):
         d = h5torch.Dataset(
             args.sctab_h5t,
             sample_processor=CellSampleProcessor(
                 SequentialPreprocessor(
-                    FilterTopGenes(affected_keys=["gene_counts", "gene_index", "gene_counts_true"], number=1024)
-                ), return_zeros=False
+                    FilterTopGenes(
+                        affected_keys=["gene_counts", "gene_index", "gene_counts_true"],
+                        number=1024,
+                    )
+                ),
+                return_zeros=False,
             ),
-            subset=np.where(ct_ind)[0])
+            subset=np.where(ct_ind)[0],
+        )
 
         for n in tqdm(subset):
-            matrix[c, d[n]["gene_index"].numpy()] = d[n]["gene_counts"].numpy().astype(np.int32)
-            c+=1
+            matrix[c, d[n]["gene_index"].numpy()] = (
+                d[n]["gene_counts"].numpy().astype(np.int32)
+            )
+            c += 1
             obs_.append(d[n]["0/obs"])
 
-
     celltype = np.array(
-        ["Myeloid cells"] * 2500 +
-        ["B cells"] * 2500 +
-        ["NK cells"] * 2500 +
-        ["T cells"] * 2500
+        ["Myeloid cells"] * 2500
+        + ["B cells"] * 2500
+        + ["NK cells"] * 2500
+        + ["T cells"] * 2500
     ).astype(bytes)
 
     obs = np.stack(obs_)
@@ -702,22 +725,12 @@ def get_sctab_grn(args):
         mode="csr",
         dtype_save="float32",
         dtype_load="float32",
-        csr_load_sparse=True
+        csr_load_sparse=True,
     )
-    f_out.register(
-        obs,
-        axis=0,
-        name="obs",
-        dtype_save="int64",
-        dtype_load="int64"
-    )
+    f_out.register(obs, axis=0, name="obs", dtype_save="int64", dtype_load="int64")
 
     f_out.register(
-        celltype,
-        axis=0,
-        name="celltype",
-        dtype_save="bytes",
-        dtype_load="str"
+        celltype, axis=0, name="celltype", dtype_save="bytes", dtype_load="str"
     )
 
     f_out.register(
@@ -735,16 +748,11 @@ def get_sctab_grn(args):
     )
 
     split = np.full((10_000), "test")
-    f_out.register(
-        split,
-        axis=0,
-        name="split",
-        dtype_save="bytes",
-        dtype_load="str"
-    )
+    f_out.register(split, axis=0, name="split", dtype_save="bytes", dtype_load="str")
 
     f_out.close()
     return None
+
 
 def get_perturb(args):
     urllib.request.urlretrieve(

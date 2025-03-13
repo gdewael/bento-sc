@@ -22,7 +22,7 @@ class BentoLoss(nn.Module):
     def forward(self, *args):
         raise NotImplementedError
 
-    def loss(self, *args): 
+    def loss(self, *args):
         raise NotImplementedError
 
 
@@ -46,7 +46,9 @@ class BinCE(BentoLoss):
 
 
 class CountMSE(BentoLoss):
-    def __init__(self, dim, exp_output=True, lib_norm=False, reduction="mean", plus_one=False):
+    def __init__(
+        self, dim, exp_output=True, lib_norm=False, reduction="mean", plus_one=False
+    ):
         super().__init__(dim, 1, reduction=reduction)
         assert not (not exp_output and lib_norm), "lib norm true needs exp output True"
         self.exp_output = exp_output
@@ -93,7 +95,7 @@ class PoissonNLL(BentoLoss):
         self.lib_norm = lib_norm
         self.zero_trunc = zero_truncated
 
-    def predict(self, x, libsize=None,  **kwargs):
+    def predict(self, x, libsize=None, **kwargs):
         y = self.output_head(x).squeeze(-1)
         if self.zero_trunc:
             if self.lib_norm:
@@ -109,7 +111,9 @@ class PoissonNLL(BentoLoss):
     def loss(self, inputs, targets):
         if self.zero_trunc:
             stabilized_term = torch.where(
-                inputs < 10, (torch.clamp(inputs,max=10).exp() - 1 + 1e-8).log(), inputs
+                inputs < 10,
+                (torch.clamp(inputs, max=10).exp() - 1 + 1e-8).log(),
+                inputs,
             )
             loss = stabilized_term - targets * (inputs + 1e-8).log()
         else:
@@ -176,7 +180,7 @@ class NegativeBinomialNLL(BentoLoss):
         log_thetas += eps
         thetas = log_thetas.exp()
         mus += eps
-        
+
         loss = (
             torch.lgamma(thetas.float())
             - torch.lgamma((targets + thetas).float())
@@ -187,12 +191,14 @@ class NegativeBinomialNLL(BentoLoss):
         if self.zero_trunc:
             stabilized_term = torch.where(
                 torch.logical_or(
-                    (mus-1+1e-8)*(thetas+1e-8) > 15,
-                    mus+thetas>15
+                    (mus - 1 + 1e-8) * (thetas + 1e-8) > 15, mus + thetas > 15
                 ),
                 thetas * (thetas + mus).log(),
-                (torch.clamp(thetas + mus, max=15) ** torch.clamp(thetas, max=15) - 
-                 torch.clamp(thetas, max=15)**torch.clamp(thetas, max=15) + 1e-8).log(),
+                (
+                    torch.clamp(thetas + mus, max=15) ** torch.clamp(thetas, max=15)
+                    - torch.clamp(thetas, max=15) ** torch.clamp(thetas, max=15)
+                    + 1e-8
+                ).log(),
             )
             loss += stabilized_term
         else:
@@ -280,7 +286,7 @@ class NCELoss(BentoLoss):
         n = len(inputs)
         targets = torch.arange(n).view(n // 2, 2).fliplr().view(n).to(inputs.device)
 
-        inputs = F.normalize(inputs, dim = -1)
+        inputs = F.normalize(inputs, dim=-1)
         inputs = (inputs @ inputs.T) / self.t
         inputs.fill_diagonal_(float("-inf"))
         return self.reduce(F.cross_entropy(inputs, targets, reduction="none"))
@@ -309,6 +315,7 @@ class CellTypeClfLoss(BentoLoss):
         y = self.predict(x)
         return self.loss(y, targets)
 
+
 class ModalityPredictionLoss(BentoLoss):
     def __init__(
         self,
@@ -322,7 +329,9 @@ class ModalityPredictionLoss(BentoLoss):
         return self.output_head(x)
 
     def loss(self, inputs, targets):
-        return self.reduce(F.mse_loss(inputs, torch.log1p(targets.to(inputs.dtype)), reduction="none"))
+        return self.reduce(
+            F.mse_loss(inputs, torch.log1p(targets.to(inputs.dtype)), reduction="none")
+        )
 
     def forward(self, x, targets):
         y = self.predict(x)
