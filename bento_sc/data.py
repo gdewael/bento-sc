@@ -484,9 +484,8 @@ class LogP1:
 
 
 class Bin:
-    def __init__(self, bins, key="gene_counts"):
-        if isinstance(bins, str):
-            bins = np.loadtxt(bins)
+    def __init__(self, key="gene_counts"):
+        bins = np.loadtxt(files("bento_sc.utils.data").joinpath("bins.txt"))
         self.bins = torch.tensor(bins)
         self.key = key
 
