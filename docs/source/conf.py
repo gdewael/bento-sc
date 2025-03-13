@@ -1,6 +1,12 @@
-import pkg_resources
+import requests
+def get_latest_version(package_name):
+    url = f"https://pypi.org/pypi/{package_name}/json"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()["info"]["version"]
+    return None
 
-version = pkg_resources.get_distribution("bento-sc").version
+version = get_latest_version("bento-sc")
 release = version
 
 import os

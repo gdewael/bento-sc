@@ -1,4 +1,4 @@
-bento-sc
+requests
 nbsphinx
 ipykernel
 myst-parser
