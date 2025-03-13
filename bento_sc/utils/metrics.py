@@ -1,5 +1,3 @@
-import torch
-
 def pearson_batch_masked(preds, trues):
 
     mask = trues == -1
