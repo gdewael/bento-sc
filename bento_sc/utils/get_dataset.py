@@ -133,6 +133,12 @@ def get_sctab_grn_parser():
         help="output .h5t file to write processed data to.",
     )
     parser.add_argument(
+        "output_extpert_path",
+        type=str,
+        metavar="output_extpert_path.h5ad",
+        help="output .h5ad file to write external perturbation data to",
+    )
+    parser.add_argument(
         "val_or_test",
         type=str,
         choices=["val", "test"],
@@ -753,6 +759,13 @@ def get_sctab_grn(args):
     f_out.register(split, axis=0, name="split", dtype_save="bytes", dtype_load="str")
 
     f_out.close()
+
+    urllib.request.urlretrieve(
+        "https://huggingface.co/datasets/gdewael/perturbh5ad/resolve/main/grn_eval_perturbation_data.h5ad",
+        args.output_extpert_path,
+    )
+
+
     return None
 
 

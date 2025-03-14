@@ -39,8 +39,8 @@ To perform downstream task evaluations, additionally process any or all task-spe
 ```bash
 bentosc_data scTab_upscaling ./scTab.h5t ./scTab_upsc_val.h5t val
 bentosc_data scTab_upscaling ./scTab.h5t ./scTab_upsc_test.h5t test
-bentosc_data scTab_grn ./scTab.h5t ./scTab_grn_val.h5t val
-bentosc_data scTab_grn ./scTab.h5t ./scTab_grn_test.h5t test
+bentosc_data scTab_grn ./scTab.h5t ./scTab_grn_val.h5t ./ext_pertdata.h5ad val
+bentosc_data scTab_grn ./scTab.h5t ./scTab_grn_test.h5t /ext_pertdata.h5ad test
 bentosc_data neurips_citeseq ./data_tmp/ ./scTab.h5t ./citeseq.h5t
 bentosc_data replogle_perturb ./data_tmp/ ./scTab.h5t ./perturb.h5t
 bentosc_data batchcorr_embryolimb ./data_tmp/ ./scTab.h5t ./batchcorr_el.h5t
