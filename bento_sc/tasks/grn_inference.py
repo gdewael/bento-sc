@@ -103,10 +103,10 @@ def get_eval_parser():
         help="path_to_embeddings",
     )
     parser.add_argument(
-        "pertdata_path", type=str, help="Path to external validation perturbation data"
+        "pertdata_path", type=str, metavar="pertdata_path", help="Path to external validation perturbation data"
     )
     parser.add_argument(
-        "scenic_database", type=str, help="SCENIC motif to gene binding database"
+        "scenic_database", type=str, metavar="scenic_database", help="SCENIC motif to gene binding database"
     )
     parser.add_argument(
         "--data_path",
