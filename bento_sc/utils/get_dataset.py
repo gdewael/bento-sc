@@ -139,6 +139,13 @@ def get_sctab_grn_parser():
         help="output .h5ad file to write external perturbation data to",
     )
     parser.add_argument(
+        "output_scenic_db_path",
+        type=str,
+        metavar="output_scenic_db_path.feather",
+        help="output .feather file to write scenic DB",
+    )
+
+    parser.add_argument(
         "val_or_test",
         type=str,
         choices=["val", "test"],
@@ -765,7 +772,11 @@ def get_sctab_grn(args):
         args.output_extpert_path,
     )
 
-
+    urllib.request.urlretrieve(
+        "https://resources.aertslab.org/cistarget/databases/homo_sapiens/hg38/refseq_r80/mc_v10_clust/gene_based/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
+        args.output_scenic_db_path,
+    )
+    
     return None
 
 
