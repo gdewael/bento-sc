@@ -125,6 +125,7 @@ def main():
 
     res = trainer.validate(model, dm.val_dataloader(), ckpt_path="best")
     print(res)
+    dm.test.sample_processor.deterministic = True
     res = trainer.validate(model, dm.test_dataloader(), ckpt_path="best")
     print(res)
 

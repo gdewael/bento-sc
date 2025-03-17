@@ -455,6 +455,7 @@ class PerturbationCellSampleProcessor:
         self.n_genes = n_genes
         path = files("bento_sc.utils.data").joinpath("gene_set_perturb.txt")
         self.gene_indices = torch.tensor(np.loadtxt(path).astype(int))
+        self.deterministic = deterministic
 
     def __call__(self, f, sample):
         gene_counts = np.zeros(self.n_genes)
