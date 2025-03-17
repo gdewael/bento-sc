@@ -80,10 +80,8 @@ class PerturbBaseline(pl.LightningModule):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y = self(batch)
-        if self.config.pred_post_pert:
-            target = batch["gene_counts_true"] - batch["gene_counts_copy"]
-        else:
-            target = batch["gene_counts_true"]
+
+        target = batch["gene_counts_true"]
 
         loss = F.mse_loss(y, target.to(y.dtype))
 
@@ -94,10 +92,8 @@ class PerturbBaseline(pl.LightningModule):
         batch["gene_counts"] = batch["gene_counts"].to(self.dtype)
 
         y = self(batch)
-        if self.config.pred_post_pert:
-            target = batch["gene_counts_true"] - batch["gene_counts_copy"]
-        else:
-            target = batch["gene_counts_true"]
+
+        target = batch["gene_counts_true"]
 
         loss = F.mse_loss(y, target.to(y.dtype))
 
