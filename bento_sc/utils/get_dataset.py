@@ -562,8 +562,6 @@ def get_sctab(args):
     )
     f_out.close()
 
-    import h5torch
-
     split_h5 = np.full(len(obs), "NA", dtype=object)
     split_h5[splits2["train"]] = "train"
     split_h5[splits2["val"]] = "val"
@@ -599,7 +597,7 @@ def get_sctab_upsc(args):
     )
 
     matrix = np.zeros((25_000, 19331), dtype="int32")
-    from scipy.sparse import csr_matrix
+
 
     obs_ = []
     for ix, n in tqdm(enumerate(k)):
