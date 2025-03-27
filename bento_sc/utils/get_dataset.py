@@ -755,7 +755,7 @@ def get_sctab_grn(args):
     )
 
     f_out.register(
-        np.concatenate(subsets),
+        subsets,
         axis="unstructured",
         name="samples",
     )
@@ -836,9 +836,9 @@ def get_perturb(args):
         else:
             new_pert_array.append(sample_filter[ff])
 
-    new_pert_array = np.array(new_pert_array, allow_pickle=True)
+    new_pert_array = np.array(new_pert_array)
 
-    splits = np.load(files("bento_sc.utils.data").joinpath("split_pert.npz"))
+    splits = np.load(files("bento_sc.utils.data").joinpath("split_pert.npz"), allow_pickle=True)
     split = splits["split"]
     matched_control = splits["matched_control"]
     train_control_indices = splits["train_control_indices"]
@@ -1122,7 +1122,7 @@ def get_ga(args):
         (f["raw/X/data"][:], f["raw/X/indices"][:], f["raw/X/indptr"][:])
     ).toarray()
 
-    gene_ids = f["var/gene"][:]
+    gene_ids = f["var/feature_name/categories"][:][f["var/feature_name/codes"][:]]
 
     f_cxg = h5py.File(args.sctab_h5t)
     gene_ids_cxg = f_cxg["1/var"][:, 0]
