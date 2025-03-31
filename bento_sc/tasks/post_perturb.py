@@ -38,6 +38,12 @@ def main():
     )
     parser.add_argument("logs_path", type=str, metavar="logs_path", help="logs_path")
     parser.add_argument(
+        "--data_path",
+        type=str,
+        default=None,
+        help="Data file. Overrides value in config file if specified",
+    )
+    parser.add_argument(
         "--lr",
         type=float,
         default=None,
@@ -68,6 +74,8 @@ def main():
 
     if args.lr is not None:
         config["lr"] = args.lr
+    if args.data_path is not None:
+        config["data_path"] = args.data_path
     if args.init_factor is not None:
         config["perturb_init_factor"] = args.init_factor
     if args.batch_size is not None:

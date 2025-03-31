@@ -50,11 +50,12 @@ def main():
         embed_parser = get_embed_parser()
         args = embed_parser.parse_args(sys.argv[2:])
         embed(args)
-
+        return None
     if args.embed_or_eval == "eval":
         eval_parser = get_eval_parser()
         args = eval_parser.parse_args(sys.argv[2:])
         eval_grn(args)
+        return None
 
 
 def get_embed_parser():

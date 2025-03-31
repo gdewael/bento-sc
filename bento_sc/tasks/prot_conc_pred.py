@@ -36,6 +36,12 @@ def main():
     parser.add_argument("checkpoint", type=str, metavar="checkpoint", help="checkpoint")
     parser.add_argument("logs_path", type=str, metavar="logs_path", help="logs_path")
     parser.add_argument(
+        "--data_path",
+        type=str,
+        default=None,
+        help="Data file. Overrides value in config file if specified",
+    )
+    parser.add_argument(
         "--n_workers",
         type=int,
         default=None,
@@ -70,6 +76,8 @@ def main():
         config["batch_size"] = args.batch_size
     if args.n_workers is not None:
         config["n_workers"] = args.n_workers
+    if args.data_path is not None:
+        config["data_path"] = args.data_path
 
     dm = BentoDataModule(config)
 
