@@ -49,12 +49,13 @@ def main():
         embed_parser = get_embed_parser()
         args = embed_parser.parse_args(sys.argv[2:])
         embed(args)
-
+        return None
+    
     if args.embed_or_correct == "correct":
         correct_parser = get_correct_parser()
         args = correct_parser.parse_args(sys.argv[2:])
         correct(args)
-
+        return None
 
 def get_embed_parser():
     parser = argparse.ArgumentParser(
