@@ -6,6 +6,7 @@
 
 BENchmarking Transformer-Obtained Single-Cell representations.
 
+
 [![PyPi Version](https://img.shields.io/pypi/v/bento-sc.svg)](https://pypi.python.org/pypi/bento-sc/)
 [![GitHub license](https://img.shields.io/github/license/gdewael/bento-sc)](https://github.com/gdewael/bento-sc/blob/main/LICENSE)
 [![Documentation](https://readthedocs.org/projects/bento-sc/badge/?version=latest&style=flat-default)](https://bento-sc.readthedocs.io/en/latest/index.html)
@@ -14,7 +15,9 @@ BENchmarking Transformer-Obtained Single-Cell representations.
 
 ## Single-cell language modeling
 
-This package contains routines and definitions for pre-training single-cell (transcriptomic) language models.
+This repository is linked to the study called "A systematic assessment of single-cell language model configurations" ([preprint paper link](https://doi.org/10.1101/2025.04.02.646825)).
+
+The package contains routines and definitions for pre-training single-cell (transcriptomic) language models.
 
 Package features:
 - Memory-efficient scRNA-seq dataloading from [`h5torch`-compatible HDF5 files](https://github.com/gdewael/h5torch).
@@ -47,4 +50,15 @@ In addition, all scripts to reproduce the "baselines" in our study are located i
 
 ## Citation
 
-:eyes: :eyes: :eyes:
+If you end up using this code in your research, please cite:
+```
+@article {dewaele2025systematic,
+	author = {De Waele, Gaetan and Menschaert, Gerben and Waegeman, Willem},
+	title = {A systematic assessment of single-cell language model configurations},
+	year = {2025},
+	doi = {10.1101/2025.04.02.646825},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2025/04/08/2025.04.02.646825},
+	journal = {bioRxiv}
+}
+```
