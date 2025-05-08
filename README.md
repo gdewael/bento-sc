@@ -62,3 +62,104 @@ If you end up using this code in your research, please cite:
 	journal = {bioRxiv}
 }
 ```
+
+## Accreditation original dataset authors
+
+The following datasets were used:
+- scTab (derived from CELLxGENE census) - CC-BY-4.0 License
+- NeurIPS 2023 Perturbation data - CC-BY-4.0 License
+- Replogle perturb-seq - CC-BY-4.0 License
+- NeurIPS 2021 CITE-seq - CC-BY-4.0 License
+- Circulating immune cells (CELLxGENE derived) - CC-BY-4.0 License
+- Embryonic limb cell atlas - CC-BY-4.0 License
+- Middle temporal gyrus among great apes - CC-BY-4.0 License
+  
+If you use *bento-sc*, please accredit the original authors:
+
+scTab:
+```
+@article{fischer2024sctab,
+	title={scTab: scaling cross-tissue single-cell annotation models},
+	author={Fischer, Felix and Fischer, David S and Mukhin, Roman and Isaev, Andrey and Biederstedt, Evan and Villani, Alexandra-Chlo{\'e} and Theis, Fabian J},
+	journal={Nature Communications},
+	volume={15},
+	number={1},
+	pages={6611},
+	year={2024},
+	publisher={Nature Publishing Group UK London}
+}
+```
+
+GRN Inference:
+```
+@article{szalata2025benchmark,
+	title={A benchmark for prediction of transcriptomic responses to chemical perturbations across cell types},
+	author={Sza{\l}ata, Artur and Benz, Andrew and Cannoodt, Robrecht and Cortes, Mauricio and Fong, Jason and Kuppasani, Sunil and Lieberman, Richard and Liu, Tianyu and Mas-Rosario, Javier and Meinl, Rico and others},
+	journal={Advances in Neural Information Processing Systems},
+	volume={37},
+	pages={20566--20616},
+	year={2025}
+}
+```
+
+Post-perturbation prediction
+```
+@article{replogle2022mapping,
+	title={Mapping information-rich genotype-phenotype landscapes with genome-scale Perturb-seq},
+	author={Replogle, Joseph M and Saunders, Reuben A and Pogson, Angela N and Hussmann, Jeffrey A and Lenail, Alexander and Guna, Alina and Mascibroda, Lauren and Wagner, Eric J and Adelman, Karen and Lithwick-Yanai, Gila and others},
+	journal={Cell},
+	volume={185},
+	number={14},
+	pages={2559--2575},
+	year={2022},
+	publisher={Elsevier}
+}
+```
+
+Surface protein abundance prediction:
+```
+@inproceedings{luecken2021sandbox,
+	title={A sandbox for prediction and integration of DNA, RNA, and proteins in single cells},
+	author={Luecken, Malte D and Burkhardt, Daniel Bernard and Cannoodt, Robrecht and Lance, Christopher and Agrawal, Aditi and Aliee, Hananeh and Chen, Ann T and Deconinck, Louise and Detweiler, Angela M and Granados, Alejandro A and others},
+	booktitle={Thirty-fifth conference on neural information processing systems datasets and benchmarks track (Round 2)},
+	year={2021}
+}
+```
+
+Batch correction:
+```
+@article{zhang2023human,
+	title={A human embryonic limb cell atlas resolved in space and time},
+	author={Zhang, Bao and He, Peng and Lawrence, John EG and Wang, Shuaiyu and Tuck, Elizabeth and Williams, Brian A and Roberts, Kenny and Kleshchevnikov, Vitalii and Mamanova, Lira and Bolt, Liam and others},
+	journal={Nature},
+	pages={1--11},
+	year={2023},
+	publisher={Nature Publishing Group UK London}
+}
+```
+
+```
+@article{jorstad2023comparative,
+	title={Comparative transcriptomics reveals human-specific cortical features},
+	author={Jorstad, Nikolas L and Song, Janet HT and Exposito-Alonso, David and Suresh, Hamsini and Castro-Pacheco, Nathan and Krienen, Fenna M and Yanny, Anna Marie and Close, Jennie and Gelfand, Emily and Long, Brian and others},
+	journal={Science},
+	volume={382},
+	number={6667},
+	pages={eade9516},
+	year={2023},
+	publisher={American Association for the Advancement of Science}
+}
+```
+
+```
+@article{ivanova2023mrna,
+	title={mRNA COVID-19 vaccine elicits potent adaptive immune response without the acute inflammation of SARS-CoV-2 infection},
+	author={Ivanova, Ellie N and Shwetar, Jasmine and Devlin, Joseph C and Buus, Terkild B and Gray-Gaillard, Sophie and Koide, Akiko and Cornelius, Amber and Samanovic, Marie I and Herrera, Alberto and Mimitou, Eleni P and others},
+	journal={Iscience},
+	volume={26},
+	number={12},
+	year={2023},
+	publisher={Elsevier}
+}
+```
+
