@@ -87,7 +87,21 @@ class BentoTransformer(pl.LightningModule):
 
         loss_type = self.config.loss["type"]
         loss_kwargs = {k: v for k, v in self.config.loss.items() if k != "type"}
-        self.loss = loss_mapper[loss_type](self.config.dim, **loss_kwargs)
+        self._use_batch_token = getattr(self.config, "use_batch_token", False)
+        loss_in_dim = self.config.dim
+        if self._use_batch_token:
+            loss_in_dim += self.config.batch_token_dim
+        self.loss = loss_mapper[loss_type](loss_in_dim, **loss_kwargs)
+
+        if self._use_batch_token:
+            # index n_tech_samples is the null/unknown token used during dropout
+            self.batch_embedding = nn.Embedding(
+                self.config.n_tech_samples + 1, self.config.batch_token_dim
+            )
+            self._null_batch_idx = self.config.n_tech_samples
+            self._batch_token_dropout = float(
+                getattr(self.config, "batch_token_dropout", 0.1)
+            )
 
         if self.config.nce_loss:
             self.nce_loss = loss.NCELoss(
@@ -98,6 +112,13 @@ class BentoTransformer(pl.LightningModule):
             self.ct_clf_loss = loss.CellTypeClfLoss(self.config.dim, 164)
 
         self.lr = float(self.config.lr)
+
+    def _get_batch_emb(self, batch, seq_len):
+        ids = batch["0/obs"][:, 8].long()
+        if self.training:
+            drop = torch.rand(len(ids), device=ids.device) < self._batch_token_dropout
+            ids = ids.masked_fill(drop, self._null_batch_idx)
+        return self.batch_embedding(ids).unsqueeze(1).expand(-1, seq_len, -1)
 
     def forward(self, batch):
         mask = batch["gene_counts"] != -1
@@ -125,8 +146,15 @@ class BentoTransformer(pl.LightningModule):
         ):
             loss = 0
         else:
+            gene_y = (
+                torch.cat(
+                    [y[:, 1:], self._get_batch_emb(batch, y.shape[1] - 1)], dim=-1
+                )
+                if self._use_batch_token
+                else y[:, 1:]
+            )
             loss = self.loss(
-                y[:, 1:],
+                gene_y,
                 batch["gene_counts_true"],
                 gene_ids=batch["gene_index"],
                 train_on=train_on,
@@ -161,8 +189,15 @@ class BentoTransformer(pl.LightningModule):
         ):
             loss = 0
         else:
+            gene_y = (
+                torch.cat(
+                    [y[:, 1:], self._get_batch_emb(batch, y.shape[1] - 1)], dim=-1
+                )
+                if self._use_batch_token
+                else y[:, 1:]
+            )
             loss = self.loss(
-                y[:, 1:],
+                gene_y,
                 batch["gene_counts_true"],
                 gene_ids=batch["gene_index"],
                 train_on=train_on,
@@ -189,8 +224,17 @@ class BentoTransformer(pl.LightningModule):
             :, None
         ]
 
+        if self._use_batch_token:
+            null_ids = torch.full(
+                (len(y),), self._null_batch_idx, device=y.device, dtype=torch.long
+            )
+            null_emb = self.batch_embedding(null_ids).unsqueeze(1).expand(-1, y.shape[1] - 1, -1)
+            gene_y = torch.cat([y[:, 1:], null_emb], dim=-1)
+        else:
+            gene_y = y[:, 1:]
+
         count_predictions = self.loss.predict(
-            y[:, 1:],
+            gene_y,
             gene_ids=batch["gene_index"],
             libsize=libsizes,
         )
@@ -221,6 +265,10 @@ class BentoTransformer(pl.LightningModule):
             "celltype_clf_loss",
             "lr",
             "train_on_all",
+            "use_batch_token",
+            "batch_token_dim",
+            "batch_token_dropout",
+            "n_tech_samples",
         }
 
     @property

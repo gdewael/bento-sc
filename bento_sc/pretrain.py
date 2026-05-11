@@ -72,6 +72,11 @@ def main():
     dm = BentoDataModule(config)
     dm.setup(None)
 
+    if config.get("use_batch_token", False):
+        import h5torch
+        with h5torch.File(config.data_path) as f:
+            config["n_tech_samples"] = f["unstructured/8_tech_sample"].shape[0]
+
     model = BentoTransformer(config)
 
     callbacks = [

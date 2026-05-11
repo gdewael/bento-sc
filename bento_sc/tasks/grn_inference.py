@@ -191,7 +191,7 @@ def embed(args):
             if len(v) > 10
         }
 
-        embeddings = torch.zeros((19331, 512))
+        embeddings = torch.zeros((19331, config.dim))
 
         for k1, v1 in aggregated_per_cell.items():
             embeddings[k1] = v1
