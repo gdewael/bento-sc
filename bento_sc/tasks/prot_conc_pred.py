@@ -91,7 +91,7 @@ def main():
     pretrained_dict_new = {
         k: v
         for k, v in pretrained_dict.items()
-        if not k.startswith(("nce_loss", "ct_clf_loss", "loss"))
+        if not k.startswith(("nce_loss", "ct_clf_loss", "loss", "batch_embedding"))
     }
     model_dict.update(pretrained_dict_new)
     model.load_state_dict(model_dict)
